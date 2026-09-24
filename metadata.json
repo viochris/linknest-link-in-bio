@@ -1,0 +1,6 @@
+{
+  "name": "LinkNest",
+  "description": "Personal link-in-bio platform with customizable public profiles, link scheduling, live theme preview, and click analytics backed by Supabase.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

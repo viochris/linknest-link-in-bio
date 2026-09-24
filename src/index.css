@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+@layer base {
+  html,
+  body,
+  #root {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+}
+
+/* Dedicated print styling for neat single-page flyer printing without mess */
+@media print {
+  @page {
+    size: auto;
+    margin: 12mm;
+  }
+
+  /* Hide all dashboard UI, navbars, background buttons, tabs */
+  header,
+  nav,
+  aside,
+  button,
+  footer,
+  #admin-navigation,
+  .no-print,
+  .print-hidden,
+  .lg\:col-span-5 {
+    display: none !important;
+  }
+
+  body, html, #root {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .lg\:col-span-7 {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Printable flyer card container */
+  .printable-flyer-card {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    max-width: 480px !important;
+    margin: 0 auto !important;
+    padding: 32px !important;
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 24px !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+}
