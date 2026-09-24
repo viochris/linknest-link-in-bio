@@ -19,50 +19,45 @@ export const DiscoverTab: React.FC<DiscoverTabProps> = ({
   const [items, setItems] = useState<DiscoverItem[]>([]);
   const [topics, setTopics] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [empty, setEmpty] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    async function fetchDiscover() {
-      try {
+  const fetchDiscover = async (isRefresh: boolean = false) => {
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
         setLoading(true);
-        setError(null);
-        const res = await fetch(`/api/discover?username=${encodeURIComponent(username)}`);
-        if (!res.ok) {
-          throw new Error('Could not fetch discover feed');
-        }
-        const data: DiscoverResponse = await res.json();
-        if (isMounted) {
-          if (data.items && data.items.length > 0) {
-            setItems(data.items);
-            setTopics(data.topics || []);
-            setEmpty(false);
-          } else {
-            setItems([]);
-            setTopics(data.topics || []);
-            setEmpty(true);
-          }
-        }
-      } catch (err: any) {
-        if (isMounted) {
-          console.warn('Discover fetch error:', err.message || err);
-          // Gracefully show the empty state instead of a broken UI
-          setEmpty(true);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
       }
+      setError(null);
+      const url = `/api/discover?username=${encodeURIComponent(username)}${isRefresh ? `&refresh=true&t=${Date.now()}` : ''}`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error('Could not fetch discover feed');
+      }
+      const data: DiscoverResponse = await res.json();
+      if (data.items && data.items.length > 0) {
+        setItems(data.items);
+        setTopics(data.topics || []);
+        setEmpty(false);
+      } else {
+        setItems([]);
+        setTopics(data.topics || []);
+        setEmpty(true);
+      }
+    } catch (err: any) {
+      console.warn('Discover fetch error:', err.message || err);
+      // Gracefully show the empty state instead of a broken UI
+      setEmpty(true);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
+  };
 
-    fetchDiscover();
-
-    return () => {
-      isMounted = false;
-    };
+  useEffect(() => {
+    fetchDiscover(false);
   }, [username]);
 
   // Card shape based on button_style
@@ -106,16 +101,34 @@ export const DiscoverTab: React.FC<DiscoverTabProps> = ({
             </h2>
           </div>
 
-          <span
-            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
-              isLightBg
-                ? 'bg-white text-indigo-700 border-indigo-200'
-                : 'bg-indigo-900/50 text-indigo-300 border-indigo-500/30'
-            }`}
-          >
-            <Sparkles className="w-3 h-3 text-indigo-400 shrink-0" />
-            <span>Google Search</span>
-          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              id="discover-refresh-btn"
+              onClick={() => fetchDiscover(true)}
+              disabled={loading || refreshing}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border transition-all cursor-pointer active:scale-95 disabled:opacity-50 ${
+                isLightBg
+                  ? 'bg-white hover:bg-indigo-50 text-indigo-700 border-indigo-200 shadow-sm'
+                  : 'bg-indigo-900/60 hover:bg-indigo-800/80 text-indigo-200 border-indigo-500/40'
+              }`}
+              title="Refresh and search for fresh trending topics"
+            >
+              <RefreshCw className={`w-3 h-3 text-indigo-400 shrink-0 ${refreshing ? 'animate-spin' : ''}`} />
+              <span>{refreshing ? 'Searching...' : 'Refresh'}</span>
+            </button>
+
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                isLightBg
+                  ? 'bg-white text-indigo-700 border-indigo-200'
+                  : 'bg-indigo-900/50 text-indigo-300 border-indigo-500/30'
+              }`}
+            >
+              <Sparkles className="w-3 h-3 text-indigo-400 shrink-0" />
+              <span>Google Search</span>
+            </span>
+          </div>
         </div>
 
         <p className={`text-[11px] sm:text-xs leading-relaxed ${isLightBg ? 'text-slate-600' : 'text-slate-300'}`}>
@@ -183,9 +196,19 @@ export const DiscoverTab: React.FC<DiscoverTabProps> = ({
           <h3 className={`text-sm font-semibold mb-1 ${textContrastClass}`}>
             Nothing to discover right now
           </h3>
-          <p className="text-xs opacity-75 max-w-sm mx-auto">
-            No trending resources available for this profile at the moment. Please check back later!
+          <p className="text-xs opacity-75 max-w-sm mx-auto mb-4">
+            No trending resources available for this profile at the moment.
           </p>
+          <button
+            type="button"
+            id="discover-empty-retry-btn"
+            onClick={() => fetchDiscover(true)}
+            disabled={refreshing}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-indigo-600/30 transition-all cursor-pointer active:scale-95 disabled:opacity-60"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-white ${refreshing ? 'animate-spin' : ''}`} />
+            <span>{refreshing ? 'Searching Topics...' : 'Search Trending Topics'}</span>
+          </button>
         </motion.div>
       )}
 

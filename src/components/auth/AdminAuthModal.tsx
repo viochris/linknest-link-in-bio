@@ -111,23 +111,6 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
     }
   };
 
-  const handleDirectBypass = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      await supabase.auth.signInWithPassword({
-        email: email || 'viochristian860@gmail.com',
-        password: password || 'demo123',
-      });
-      onSuccess();
-      onClose();
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleDemoLogin = async () => {
     setLoading(true);
     setError(null);
@@ -236,33 +219,9 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
 
         {/* Alert Messages */}
         {error && (
-          <div className="mb-4 p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-300 text-xs space-y-2.5">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
-              <div className="flex-1">
-                <span className="font-medium text-rose-200">{error}</span>
-                {error.toLowerCase().includes('rate limit') && (
-                  <p className="mt-1 text-[11px] text-rose-300/80">
-                    Supabase rate-limited confirmation emails. You can directly access your dashboard using the instant bypass button below.
-                  </p>
-                )}
-                {error.toLowerCase().includes('not confirmed') && (
-                  <p className="mt-1 text-[11px] text-rose-300/80">
-                    Email not confirmed yet. Click the button below to directly enter the dashboard.
-                  </p>
-                )}
-              </div>
-            </div>
-            <button
-              id="auth-bypass-btn"
-              type="button"
-              onClick={handleDirectBypass}
-              disabled={loading}
-              className="w-full py-2 px-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5 shadow-sm"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Access Dashboard Directly (Bypass Confirmation)</span>
-            </button>
+          <div className="mb-4 p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-300 text-xs flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+            <span className="font-medium text-rose-200">{error}</span>
           </div>
         )}
 
@@ -402,24 +361,6 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
           <p className="text-[11px] text-slate-500">
             *Demo account comes with pre-configured sample links and interactive analytics.
           </p>
-
-          {/* Dedicated direct access for Silvio's authentic account */}
-          <div className="pt-1.5">
-            <button
-              id="silvio-owner-login-btn"
-              type="button"
-              onClick={() => {
-                setEmail('viochristian860@gmail.com');
-                setPassword('demo123');
-                handleDirectBypass();
-              }}
-              disabled={loading}
-              className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors inline-flex items-center gap-1.5 hover:underline"
-            >
-              <span>Account Owner?</span>
-              <span className="font-semibold">Sign in as Silvio Christian Joe (@silvio)</span>
-            </button>
-          </div>
         </div>
 
         {/* Forgot password modal / drawer */}

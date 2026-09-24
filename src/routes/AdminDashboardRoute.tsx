@@ -17,7 +17,7 @@ export const AdminDashboardRoute: React.FC<AdminDashboardRouteProps> = ({
 }) => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [profileUsername, setProfileUsername] = useState<string>('silvio');
+  const [profileUsername, setProfileUsername] = useState<string>(user.email?.split('@')[0] || 'creator');
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimerRef = useRef<any>(null);
@@ -89,7 +89,7 @@ export const AdminDashboardRoute: React.FC<AdminDashboardRouteProps> = ({
           username: profileUsername,
           display_name: user.email?.split('@')[0] || profileUsername,
           bio: '',
-          avatar_url: '/avatar-silvio.png',
+          avatar_url: '/icon.svg',
           theme: 'dark',
           accent_color: '#818cf8',
           button_style: 'rounded',

@@ -272,21 +272,21 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
             <button
               id="back-to-home-btn"
               onClick={() => {
-                window.location.href = '/silvio';
+                window.location.href = '/demo';
               }}
               className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-medium text-sm transition-all"
             >
-              View Demo Profile (@silvio)
+              View Live Demo
             </button>
-            {onOpenDashboard && (
-              <button
-                id="create-account-btn"
-                onClick={onOpenDashboard}
-                className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium text-sm transition-all"
-              >
-                Claim This Username / Create Account
-              </button>
-            )}
+            <button
+              id="go-to-homepage-btn"
+              onClick={() => {
+                window.location.href = '/';
+              }}
+              className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium text-sm transition-all"
+            >
+              Back to Home
+            </button>
           </div>
         </div>
       </div>
@@ -805,7 +805,7 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
                   {/* Profile summary with Live indicator */}
                   <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 flex items-center gap-3">
                     <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-800 shrink-0 border border-slate-700">
-                      <img src={profile.avatar_url || '/avatar-silvio.png'} alt={profile.display_name} className="w-full h-full object-cover" />
+                      <img src={profile.avatar_url || '/icon.svg'} alt={profile.display_name} className="w-full h-full object-cover" />
                     </div>
                     <div className="text-left overflow-hidden flex-1">
                       <div className="flex items-center gap-2">

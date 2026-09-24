@@ -38,28 +38,36 @@ import { LinkNestLogo } from '../common/LinkNestLogo';
 interface FaqItem {
   question: string;
   answer: string;
+  linkUrl?: string;
+  linkLabel?: string;
 }
 
 const FAQ_ITEMS: FaqItem[] = [
   {
-    question: 'Is LinkNest free to use, and are there any link limits?',
-    answer: 'Yes! LinkNest provides unlimited links, custom profiles, full theme customization, and 7-day click analytics with zero subscription fees or artificial paywalls.',
+    question: 'Is LinkNest completely free to use, and are there any link or feature limits?',
+    answer: 'Yes! LinkNest is 100% free and open-source with zero subscription fees, artificial link caps, or hidden paywalls. You can create unlimited links, reorder them dynamically, configure scheduled launch and expiration dates, choose from custom theme presets, design unique color gradients, track click analytics over 7 days, and download high-resolution QR codes without ever needing to enter a credit card.',
   },
   {
-    question: 'Can I download print-ready QR codes and table-tent flyers?',
-    answer: 'Absolutely. LinkNest includes a dedicated QR Code & Flyers studio where you can export ultra-high-resolution PNGs (up to 2048px) and scalable vector SVGs suitable for commercial print shops, standee cards, and event table tents.',
+    question: 'How does LinkNest keep my profile data safe, protected, and reliably stored?',
+    answer: 'All profile records, link collections, theme configurations, and analytics logs are persisted in a production-grade Supabase PostgreSQL database protected by Row Level Security (RLS) policies. This architecture ensures that only authenticated creators can modify their own content. In addition, you can enable custom password protection on your public profile, allowing you to safeguard sensitive projects, exclusive portfolios, or private client links behind an access code.',
   },
   {
-    question: 'How does the 7-day link click analytics engine work?',
-    answer: 'Every link visit is tracked securely via Supabase database events. You get daily click velocities, top-performing links, and visual trend charts powered by Recharts without invasive tracking cookies.',
+    question: 'What should I do if I encounter an error, bug, or technical issue?',
+    answer: 'LinkNest is actively maintained as an open-source project. If you experience an unexpected error, visual glitch, or have an idea for a feature improvement, please report it directly on our official GitHub repository. Head over to https://github.com/viochris/linknest-link-in-bio and open a new issue describing what happened, including any reproducible steps or error screenshots. Our team reviews issues and deploys fixes promptly.',
+    linkUrl: 'https://github.com/viochris/linknest-link-in-bio',
+    linkLabel: 'Open an Issue on GitHub (viochris/linknest-link-in-bio)',
   },
   {
-    question: 'Can I add direct WhatsApp chats, social icons, and interactive portfolios?',
-    answer: 'Yes! You can configure direct WhatsApp chat triggers, social links (Instagram, X, GitHub, LinkedIn), and showcase interactive portfolio items with custom status badges.',
+    question: 'Can I download print-ready QR codes and table-tent flyers for offline promotion?',
+    answer: 'Absolutely! LinkNest includes a dedicated QR Code Studio and Flyer Generator engineered specifically for physical marketing, in-person networking, and retail promotion. You can customize the QR code color scheme (Indigo, Slate, Emerald, Classic Black), embed your profile avatar directly in the center, and export in scalable vector SVG (for commercial printers and large banners) or ultra-high-resolution PNG (up to 2048px HD). You can also download complete printable event standees and table-tent flyers ready for display.',
   },
   {
-    question: 'Is my data backed up and secure?',
-    answer: 'Yes. All profile records, link orders, and analytics events are persisted in Supabase with Row Level Security (RLS) policies enforcing safe data isolation.',
+    question: 'How does the built-in 7-day link click analytics engine work?',
+    answer: 'Every link click and profile visit is captured in real time through secure database events, eliminating the need for intrusive third-party tracking scripts or privacy-invasive advertising cookies. Inside your Admin Dashboard, an interactive chart powered by Recharts reveals your daily click velocity over the past 7 days, cumulative lifetime clicks, top-performing links ranked by engagement, and percentage distributions to help you understand your audience effectively.',
+  },
+  {
+    question: 'What interactive integrations, social networks, and link types are supported?',
+    answer: 'LinkNest supports standard web links, direct WhatsApp click-to-chat triggers with prefilled message templates, portfolio showcases with live status indicators (Live, Beta, WIP, Sold Out), and social icon badges for GitHub, LinkedIn, Instagram, X (Twitter), YouTube, Kaggle, Email, and more. You can also organize your links by category sections, pin priority links to the top, and enable an automated Trending & Discover tab that curates web resources tailored to your bio interests.',
   },
 ];
 
@@ -68,13 +76,9 @@ export const LandingPage: React.FC = () => {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const [mockCopied, setMockCopied] = useState(false);
 
-  const displayHost = typeof window !== 'undefined' && window.location.host
-    ? window.location.host
-    : 'linknest-link-in-bio.vercel.app';
-
   const handleCopyMockUrl = () => {
     const origin = typeof window !== 'undefined' ? window.location.origin : 'https://linknest-link-in-bio.vercel.app';
-    navigator.clipboard.writeText(`${origin}/silvio`);
+    navigator.clipboard.writeText(`${origin}/demo`);
     setMockCopied(true);
     setTimeout(() => setMockCopied(false), 2000);
   };
@@ -155,24 +159,36 @@ export const LandingPage: React.FC = () => {
             </p>
 
             {/* Main Action Buttons */}
-            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 w-full">
-              <button
-                type="button"
-                id="hero-get-started-btn"
-                onClick={() => navigate('/admin/login?mode=signup')}
-                className="w-full sm:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-              >
-                <span>Create Your Page</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
+            <div className="pt-2 flex flex-col items-center lg:items-start gap-2.5 w-full max-w-md">
+              <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 w-full">
+                <button
+                  type="button"
+                  id="hero-get-started-btn"
+                  onClick={() => navigate('/admin/login?mode=signup')}
+                  className="flex-1 w-full sm:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                >
+                  <span>Create Your Page</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
 
+                <Link
+                  to="/demo"
+                  id="hero-demo-profile-btn"
+                  className="flex-1 w-full sm:w-auto px-6 py-3 bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-800 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Eye className="w-4 h-4 text-indigo-400" />
+                  <span>View Live Demo</span>
+                </Link>
+              </div>
+
+              {/* Silvio's Live Profile - exclusively placed here with full matching width */}
               <Link
                 to="/silvio"
-                id="hero-demo-profile-btn"
-                className="w-full sm:w-auto px-6 py-3 bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-800 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer"
+                id="hero-silvio-profile-btn"
+                className="w-full py-2.5 px-4 bg-indigo-950/40 hover:bg-indigo-900/60 text-indigo-300 hover:text-white border border-indigo-500/30 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-sm group"
               >
-                <Eye className="w-4 h-4 text-indigo-400" />
-                <span>View Live Demo (@silvio)</span>
+                <span>View Silvio's Live Profile (@silvio)</span>
+                <ArrowRight className="w-3.5 h-3.5 text-indigo-400 group-hover:translate-x-0.5 transition-transform" />
               </Link>
             </div>
 
@@ -216,7 +232,7 @@ export const LandingPage: React.FC = () => {
                 <div className="flex items-center justify-end gap-1.5 px-1">
                   <button
                     type="button"
-                    onClick={() => navigate('/silvio')}
+                    onClick={() => navigate('/demo')}
                     className="w-6 h-6 rounded-full bg-indigo-900/50 border border-indigo-500/30 flex items-center justify-center text-indigo-400 hover:text-white transition-colors cursor-pointer"
                     title="View QR Code"
                   >
@@ -236,22 +252,22 @@ export const LandingPage: React.FC = () => {
                 <div className="space-y-1.5 pt-0.5">
                   <div className="w-16 h-16 rounded-full mx-auto p-0.5 ring-2 ring-indigo-500/40 bg-gradient-to-tr from-indigo-500/30 to-purple-500/20 shadow-lg overflow-hidden">
                     <img
-                      src="/avatar-silvio.png"
-                      alt="Silvio Santos"
+                      src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80"
+                      alt="Alex Rivera"
                       className="w-full h-full object-cover rounded-full"
                     />
                   </div>
                   <div className="space-y-0.5">
                     <h3 className="text-sm font-extrabold text-white tracking-tight">
-                      Silvio Santos
+                      Alex Rivera
                     </h3>
-                    <div className="text-[11px] text-slate-400 font-medium">@silvio</div>
+                    <div className="text-[11px] text-slate-400 font-medium">@alex</div>
                     <div className="text-[11px] font-semibold text-slate-200">
-                      Full-Stack Engineer &amp; UI Architect 🚀
+                      Creative Technologist &amp; UI Engineer ✨
                     </div>
                   </div>
                   <p className="text-[10px] text-slate-400 leading-snug px-3 max-w-[260px] mx-auto">
-                    Building delightful web experiences, developer tools, and interfaces.
+                    Exploring AI design systems, WebGL interactions, and modern web products.
                   </p>
                 </div>
 
@@ -438,7 +454,7 @@ export const LandingPage: React.FC = () => {
               <div className="text-4xl font-extrabold text-slate-800">01</div>
               <h3 className="text-base font-bold text-white">Claim Your Unique Handle</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Sign up with your email to claim your personalized public address (<code className="text-indigo-300 font-mono">{displayHost}/yourname</code>).
+                Sign up with your email to claim your personalized public address and unique custom handle.
               </p>
             </div>
 
@@ -547,8 +563,21 @@ export const LandingPage: React.FC = () => {
                   )}
                 </button>
                 {activeFaq === idx && (
-                  <div className="px-4 pb-4 text-xs text-slate-400 leading-relaxed border-t border-slate-800/60 pt-3">
-                    {item.answer}
+                  <div className="px-4 pb-4 text-xs text-slate-300 leading-relaxed border-t border-slate-800/60 pt-3 space-y-2.5">
+                    <p>{item.answer}</p>
+                    {item.linkUrl && (
+                      <div className="pt-1">
+                        <a
+                          href={item.linkUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-medium transition-colors"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>{item.linkLabel || item.linkUrl}</span>
+                        </a>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -579,12 +608,12 @@ export const LandingPage: React.FC = () => {
             </button>
 
             <Link
-              to="/silvio"
+              to="/demo"
               id="cta-bottom-demo-btn"
               className="w-full sm:w-auto px-7 py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <Eye className="w-4 h-4 text-slate-400" />
-              <span>Explore Demo Profile</span>
+              <span>View Live Demo</span>
             </Link>
           </div>
         </section>
@@ -601,9 +630,9 @@ export const LandingPage: React.FC = () => {
             </span>
           </div>
 
-          <div className="flex items-center gap-5 text-slate-400 font-medium">
+          <div className="flex items-center gap-5 text-slate-400 font-medium flex-wrap justify-center">
             <Link to="/admin/login" className="hover:text-white transition-colors">Admin Dashboard</Link>
-            <Link to="/silvio" className="hover:text-white transition-colors">Silvio Live Page</Link>
+            <Link to="/demo" className="hover:text-white transition-colors">Live Demo</Link>
             <a href="#features" className="hover:text-white transition-colors">Features</a>
             <a href="#faq" className="hover:text-white transition-colors">FAQ</a>
           </div>

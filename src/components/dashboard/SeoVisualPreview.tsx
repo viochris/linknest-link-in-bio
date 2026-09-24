@@ -37,7 +37,7 @@ export const SeoVisualPreview: React.FC<SeoVisualPreviewProps> = ({
   const [copiedMeta, setCopiedMeta] = useState(false);
 
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://linknest.app';
-  const username = profile.username || 'silvio';
+  const username = profile.username || 'username';
   const displayName = profile.display_name || username;
   const canonicalUrl = `${origin}/${username}`;
 
@@ -63,7 +63,7 @@ export const SeoVisualPreview: React.FC<SeoVisualPreviewProps> = ({
       : `Explore verified links, portfolio projects, and social channels for ${displayName} (@${username}) on LinkNest.`
   );
 
-  let absoluteAvatar = profile.avatar_url || '/avatar-silvio.png';
+  let absoluteAvatar = profile.avatar_url || '/icon.svg';
   if (absoluteAvatar.startsWith('/')) {
     absoluteAvatar = `${origin}${absoluteAvatar}`;
   }

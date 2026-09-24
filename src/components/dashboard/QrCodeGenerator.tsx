@@ -28,7 +28,7 @@ export const QrCodeGenerator: React.FC<QrCodeGeneratorProps> = ({
   onClose,
   username,
   displayName,
-  avatarUrl = '/avatar-silvio.png',
+  avatarUrl = '/icon.svg',
 }) => {
   const [dataUrl, setDataUrl] = useState<string>('');
   const [svgString, setSvgString] = useState<string>('');
@@ -40,7 +40,7 @@ export const QrCodeGenerator: React.FC<QrCodeGeneratorProps> = ({
   const printableFlyerRef = useRef<HTMLDivElement | null>(null);
 
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://linknest.app';
-  const cleanUsername = (username || 'silvio').trim();
+  const cleanUsername = (username || 'user').trim();
   const profileUrl = `${origin}/${cleanUsername}`;
   const effectiveDisplayName = displayName || cleanUsername;
 

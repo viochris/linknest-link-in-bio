@@ -200,10 +200,11 @@ function generateHistoricalClicks(profileId: string, links: LinkItem[]): LinkCli
 
 function getInitialDbState(): LocalDatabaseState {
   try {
-    // Clear stale caches
+    // Clear stale caches and un-scoped legacy profile key
     for (let i = 1; i <= 11; i++) {
       localStorage.removeItem(`linknest_supabase_db_v${i}`);
     }
+    localStorage.removeItem('linknest_saved_profile');
 
     const saved = localStorage.getItem(DB_STORAGE_KEY);
     if (saved) {
@@ -211,42 +212,48 @@ function getInitialDbState(): LocalDatabaseState {
       if (parsed.profiles && parsed.links && parsed.social_icons) {
         // Ensure every link has a valid category & description without overwriting user custom edits
         parsed.links = parsed.links.map((l: LinkItem) => {
-          const matchingSeed = SEED_LINKS_SILVIO.find(s => s.id === l.id);
-          const category = l.category || matchingSeed?.category || 'General';
-          const description = l.description !== undefined ? l.description : (matchingSeed?.description || null);
+          // Strictly isolate Silvio's specific URLs to Silvio's profile
+          if (l.profile_id === SEED_PROFILE_SILVIO.id) {
+            const matchingSeed = SEED_LINKS_SILVIO.find(s => s.id === l.id);
+            const category = l.category || matchingSeed?.category || 'General';
+            const description = l.description !== undefined ? l.description : (matchingSeed?.description || null);
 
-          // Direct LinkedIn, GitHub, and Instagram to authentic profiles directly
-          let fixedUrl = l.url;
-          if (fixedUrl === 'https://github.com' || (l.icon === 'github' && fixedUrl.endsWith('github.com'))) {
-            fixedUrl = 'https://github.com/viochris';
-          } else if (fixedUrl === 'https://linkedin.com' || (l.icon === 'linkedin' && fixedUrl.endsWith('linkedin.com'))) {
-            fixedUrl = 'https://www.linkedin.com/in/silvio-christian-joe';
-          } else if (fixedUrl === 'https://instagram.com' || (l.icon === 'instagram' && fixedUrl.endsWith('instagram.com'))) {
-            fixedUrl = 'https://www.instagram.com/silvio.codes';
-          }
-
-          return {
-            ...l,
-            url: fixedUrl,
-            category,
-            description,
-            is_active: l.is_active !== undefined ? l.is_active : true,
-            is_featured: l.is_featured !== undefined ? l.is_featured : false,
-          };
-        });
-
-        // Also upgrade social icons if they point to generic homepages
-        if (parsed.social_icons) {
-          parsed.social_icons = parsed.social_icons.map((s: SocialIconItem) => {
-            let fixedUrl = s.url;
-            if (s.platform === 'github' && (fixedUrl === 'https://github.com' || !fixedUrl.includes('/viochris'))) {
+            let fixedUrl = l.url;
+            if (fixedUrl === 'https://github.com' || (l.icon === 'github' && fixedUrl.endsWith('github.com'))) {
               fixedUrl = 'https://github.com/viochris';
-            } else if (s.platform === 'linkedin' && (fixedUrl === 'https://linkedin.com' || !fixedUrl.includes('/silvio-christian-joe'))) {
+            } else if (fixedUrl === 'https://linkedin.com' || (l.icon === 'linkedin' && fixedUrl.endsWith('linkedin.com'))) {
               fixedUrl = 'https://www.linkedin.com/in/silvio-christian-joe';
-            } else if (s.platform === 'instagram' && (fixedUrl === 'https://instagram.com' || !fixedUrl.includes('/silvio.codes'))) {
+            } else if (fixedUrl === 'https://instagram.com' || (l.icon === 'instagram' && fixedUrl.endsWith('instagram.com'))) {
               fixedUrl = 'https://www.instagram.com/silvio.codes';
             }
-            return { ...s, url: fixedUrl };
+
+            return {
+              ...l,
+              url: fixedUrl,
+              category,
+              description,
+              is_active: l.is_active !== undefined ? l.is_active : true,
+              is_featured: l.is_featured !== undefined ? l.is_featured : false,
+            };
+          }
+          return l;
+        });
+
+        // Also upgrade social icons strictly for Silvio's profile
+        if (parsed.social_icons) {
+          parsed.social_icons = parsed.social_icons.map((s: SocialIconItem) => {
+            if (s.profile_id === SEED_PROFILE_SILVIO.id) {
+              let fixedUrl = s.url;
+              if (s.platform === 'github' && (fixedUrl === 'https://github.com' || !fixedUrl.includes('/viochris'))) {
+                fixedUrl = 'https://github.com/viochris';
+              } else if (s.platform === 'linkedin' && (fixedUrl === 'https://linkedin.com' || !fixedUrl.includes('/silvio-christian-joe'))) {
+                fixedUrl = 'https://www.linkedin.com/in/silvio-christian-joe';
+              } else if (s.platform === 'instagram' && (fixedUrl === 'https://instagram.com' || !fixedUrl.includes('/silvio.codes'))) {
+                fixedUrl = 'https://www.instagram.com/silvio.codes';
+              }
+              return { ...s, url: fixedUrl };
+            }
+            return s;
           });
         }
 

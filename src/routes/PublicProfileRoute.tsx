@@ -13,7 +13,7 @@ export { generateProfileSEO } from '../utils/seo';
 
 export const PublicProfileRoute: React.FC = () => {
   const { username } = useParams<{ username?: string }>();
-  const rawUsername = username?.trim() || 'silvio';
+  const rawUsername = username?.trim() || 'demo';
   const cleanUsername = rawUsername.toLowerCase();
   const [profile, setProfile] = useState<Profile | null>(null);
 

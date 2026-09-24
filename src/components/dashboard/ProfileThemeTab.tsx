@@ -259,7 +259,6 @@ export const ProfileThemeTab: React.FC<ProfileThemeTabProps> = ({
       try {
         localStorage.setItem('linknest_custom_profile_' + profile.id, JSON.stringify(merged));
         localStorage.setItem('linknest_custom_social_' + profile.id, JSON.stringify(localSocial));
-        localStorage.setItem('linknest_saved_profile', JSON.stringify(merged));
       } catch {}
 
       // Update parent component state
@@ -326,7 +325,7 @@ export const ProfileThemeTab: React.FC<ProfileThemeTabProps> = ({
       )}
 
       {/* Settings Form */}
-      <form onSubmit={handleSave} className="max-w-4xl mx-auto space-y-6 w-full min-w-0">
+      <form onSubmit={handleSave} className="space-y-6 w-full min-w-0">
           {/* Section 1: Basic Profile */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 space-y-5">
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
@@ -342,7 +341,7 @@ export const ProfileThemeTab: React.FC<ProfileThemeTabProps> = ({
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 rounded-full overflow-hidden bg-slate-800 border-2 border-indigo-500/40 shrink-0">
                   <img
-                    src={avatarUrl || '/avatar-silvio.png'}
+                    src={avatarUrl || profile.avatar_url || '/icon.svg'}
                     alt="Preview"
                     className="w-full h-full object-cover"
                   />
@@ -989,7 +988,7 @@ export const ProfileThemeTab: React.FC<ProfileThemeTabProps> = ({
             <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-2.5 text-xs">
               <div className="flex items-center gap-3">
                 <img
-                  src={avatarUrl || profile.avatar_url || '/avatar-silvio.png'}
+                  src={avatarUrl || profile.avatar_url || '/icon.svg'}
                   alt={displayName}
                   className="w-10 h-10 rounded-full object-cover border border-slate-700 shrink-0"
                 />

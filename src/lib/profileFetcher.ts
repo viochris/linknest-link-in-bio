@@ -67,7 +67,7 @@ export function getUserProfileMetadata(
   profile: Profile | null,
   baseUrl?: string
 ): UserProfileMetadata {
-  const cleanUsername = (username || profile?.username || 'silvio').trim().toLowerCase();
+  const cleanUsername = (username || profile?.username || 'user').trim().toLowerCase();
   const origin = baseUrl || (typeof window !== 'undefined' ? window.location.origin : 'https://linknest.app');
   const canonicalUrl = `${origin}/${cleanUsername}`;
 
@@ -86,7 +86,7 @@ export function getUserProfileMetadata(
     : `Explore @${cleanUsername}'s official verified links, projects, and social profiles on LinkNest. Connect on GitHub, LinkedIn, Instagram, and more.`;
 
   // Avatar URL
-  let avatar = profile?.avatar_url || '/avatar-silvio.png';
+  let avatar = profile?.avatar_url || '/icon.svg';
   if (avatar.startsWith('/')) {
     avatar = `${origin}${avatar}`;
   }

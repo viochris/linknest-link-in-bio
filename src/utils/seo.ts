@@ -110,7 +110,7 @@ function resolveProfileFields(input: ProfileSEOInput) {
     .trim();
 
   const rawAvatar =
-    input.avatarUrl || input.profile?.avatar_url || '/avatar-silvio.png';
+    input.avatarUrl || input.profile?.avatar_url || '/icon.svg';
 
   let absoluteAvatar = rawAvatar;
   if (absoluteAvatar.startsWith('/')) {

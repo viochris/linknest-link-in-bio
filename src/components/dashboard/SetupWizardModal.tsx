@@ -25,7 +25,7 @@ interface SetupWizardModalProps {
 }
 
 const PRESET_AVATARS = [
-  { id: 'dev', url: '/avatar-silvio.png', label: 'Silvio / Tech' },
+  { id: 'dev', url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80', label: 'Tech & Code' },
   { id: 'creative', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80', label: 'Creative' },
   { id: 'minimal', url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80', label: 'Modern' },
   { id: 'gradient', url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400&auto=format&fit=crop&q=80', label: 'Vibrant' },
@@ -40,7 +40,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({
   const [step, setStep] = useState<1 | 2>(1);
   const [username, setUsername] = useState(profile.username || '');
   const [displayName, setDisplayName] = useState(profile.display_name || '');
-  const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url || '/avatar-silvio.png');
+  const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [saving, setSaving] = useState(false);
   const [usernameError, setUsernameError] = useState<string | null>(null);
@@ -52,7 +52,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({
     if (isOpen) {
       setUsername(profile.username || '');
       setDisplayName(profile.display_name || '');
-      setAvatarUrl(profile.avatar_url || '/avatar-silvio.png');
+      setAvatarUrl(profile.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80');
       setStep(1);
       setUsernameError(null);
       setGeneralError(null);
@@ -443,7 +443,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({
                       alt="Avatar preview"
                       className="w-24 h-24 rounded-full object-cover border-2 border-indigo-500/60 ring-4 ring-indigo-500/10 shadow-lg"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/avatar-silvio.png';
+                        (e.target as HTMLImageElement).src = '/icon.svg';
                       }}
                     />
                     <label

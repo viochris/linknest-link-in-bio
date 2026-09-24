@@ -34,10 +34,10 @@ export const MetaTags: React.FC<MetaTagsProps> = ({
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://linknest.app';
 
   // Resolve values with priority to direct props, then profile object, then safe fallbacks
-  const resolvedUsername = (username || profile?.username || 'silvio').trim();
+  const resolvedUsername = (username || profile?.username || 'user').trim();
   const resolvedDisplayName = (displayName || profile?.display_name || resolvedUsername).trim();
   const resolvedBio = (bio !== undefined ? bio : profile?.bio || '').trim();
-  const rawAvatar = avatarUrl || profile?.avatar_url || '/avatar-silvio.png';
+  const rawAvatar = avatarUrl || profile?.avatar_url || '/icon.svg';
   const resolvedAccent = accentColor || profile?.theme?.accent_color || '#6366f1';
 
   // SEO Page Title based on meta_title first, then username and display name

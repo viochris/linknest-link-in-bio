@@ -207,11 +207,11 @@ export const ShareProfileModal: React.FC<ShareProfileModalProps> = ({
           <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/90 flex items-center gap-3.5 shadow-inner">
             <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-800 shrink-0 border-2 border-indigo-500/40 shadow-sm relative">
               <img
-                src={profile.avatar_url || '/avatar-silvio.png'}
+                src={profile.avatar_url || '/icon.svg'}
                 alt={profile.display_name}
                 className="w-full h-full object-cover"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = '/avatar-silvio.png';
+                  (e.target as HTMLImageElement).src = '/icon.svg';
                 }}
               />
             </div>

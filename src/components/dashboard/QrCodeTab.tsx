@@ -34,7 +34,10 @@ export const QrCodeTab: React.FC<QrCodeTabProps> = ({ profile, onViewPublicProfi
   const [downloadingFlyerImage, setDownloadingFlyerImage] = useState(false);
   const flyerRef = useRef<HTMLDivElement | null>(null);
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://linknest.app';
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://linknest-link-in-bio.vercel.app';
+  const displayHost = typeof window !== 'undefined' && window.location.host
+    ? window.location.host
+    : 'linknest-link-in-bio.vercel.app';
   const profileUrl = `${origin}/${profile.username}`;
 
   const getColorHex = (c: 'indigo' | 'slate' | 'black' | 'emerald') => {
@@ -216,7 +219,7 @@ export const QrCodeTab: React.FC<QrCodeTabProps> = ({ profile, onViewPublicProfi
       ctx.fillText('Instant access to all links, portfolio projects & contact socials.', width / 2, 528 * scale);
 
       // URL Pill
-      const pillText = `linknest.app/${profile.username}`;
+      const pillText = `${displayHost}/${profile.username}`;
       ctx.fillStyle = '#f1f5f9';
       const pillWidth = 240 * scale;
       const pillHeight = 32 * scale;
@@ -297,176 +300,178 @@ export const QrCodeTab: React.FC<QrCodeTabProps> = ({ profile, onViewPublicProfi
       </div>
 
       {/* Main Grid: QR Controls & Flyer Preview */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         {/* Left Column: QR Code Visual & Quick Actions (5 cols) */}
-        <div className="lg:col-span-5 space-y-4 print-hidden">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col items-center text-center shadow-xl">
-            {/* Color Palette Selector */}
-            <div className="w-full flex items-center justify-between pb-4 mb-4 border-b border-slate-800 text-xs text-slate-400">
-              <span className="font-medium flex items-center gap-1.5">
-                <Palette className="w-3.5 h-3.5 text-indigo-400" />
-                <span>QR Color</span>
-              </span>
-              <div className="flex items-center gap-1.5">
-                {(['indigo', 'slate', 'black', 'emerald'] as const).map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    onClick={() => setQrColor(color)}
-                    className={`w-6 h-6 rounded-full border-2 transition-transform active:scale-95 cursor-pointer ${
-                      color === 'indigo'
-                        ? 'bg-indigo-600'
-                        : color === 'slate'
-                        ? 'bg-slate-700'
-                        : color === 'emerald'
-                        ? 'bg-emerald-600'
-                        : 'bg-black'
-                    } ${qrColor === color ? 'border-white scale-110 shadow-md' : 'border-slate-800 opacity-60'}`}
-                    title={color.toUpperCase()}
-                  />
-                ))}
+        <div className="lg:col-span-5 flex flex-col h-full print-hidden">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col items-center text-center shadow-xl h-full flex-1 justify-between">
+            <div className="w-full flex flex-col items-center">
+              {/* Color Palette Selector */}
+              <div className="w-full flex items-center justify-between pb-4 mb-4 border-b border-slate-800 text-xs text-slate-400">
+                <span className="font-medium flex items-center gap-1.5">
+                  <Palette className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>QR Color</span>
+                </span>
+                <div className="flex items-center gap-1.5">
+                  {(['indigo', 'slate', 'black', 'emerald'] as const).map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setQrColor(color)}
+                      className={`w-6 h-6 rounded-full border-2 transition-transform active:scale-95 cursor-pointer ${
+                        color === 'indigo'
+                          ? 'bg-indigo-600'
+                          : color === 'slate'
+                          ? 'bg-slate-700'
+                          : color === 'emerald'
+                          ? 'bg-emerald-600'
+                          : 'bg-black'
+                      } ${qrColor === color ? 'border-white scale-110 shadow-md' : 'border-slate-800 opacity-60'}`}
+                      title={color.toUpperCase()}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
 
-            {/* QR Visual Canvas */}
-            <div className="relative p-4 bg-white rounded-2xl shadow-xl transition-all">
-              {dataUrl ? (
-                <div className="relative">
-                  <img
-                    src={dataUrl}
-                    alt={`QR Code for ${profile.username}`}
-                    className="w-56 h-56 object-contain rounded-lg"
-                  />
-                  {showAvatarBadge && profile.avatar_url && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <div className="w-12 h-12 rounded-full border-2 border-white bg-white overflow-hidden shadow-lg">
-                        <img
-                          src={profile.avatar_url}
-                          alt={profile.display_name}
-                          className="w-full h-full object-cover"
-                        />
+              {/* QR Visual Canvas */}
+              <div className="relative p-4 bg-white rounded-2xl shadow-xl transition-all">
+                {dataUrl ? (
+                  <div className="relative">
+                    <img
+                      src={dataUrl}
+                      alt={`QR Code for ${profile.username}`}
+                      className="w-56 h-56 object-contain rounded-lg"
+                    />
+                    {showAvatarBadge && profile.avatar_url && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="w-12 h-12 rounded-full border-2 border-white bg-white overflow-hidden shadow-lg">
+                          <img
+                            src={profile.avatar_url}
+                            alt={profile.display_name}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="w-56 h-56 flex items-center justify-center text-slate-400 text-xs">
-                  {isGenerating ? 'Generating QR...' : 'Failed to generate'}
-                </div>
-              )}
-            </div>
-
-            {/* Avatar Badge Toggle */}
-            <label className="flex items-center gap-2 mt-4 text-xs text-slate-300 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={showAvatarBadge}
-                onChange={(e) => setShowAvatarBadge(e.target.checked)}
-                className="w-4 h-4 rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0 cursor-pointer"
-              />
-              <span>Include Profile Avatar in QR Center</span>
-            </label>
-
-            {/* Destination URL Box with Quick Copy & Open */}
-            <div className="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-left space-y-2 mt-4">
-              <div className="flex items-center justify-between text-[11px] text-slate-400">
-                <span className="font-semibold text-slate-300">Target Public Profile URL:</span>
-                <span className="text-indigo-400 font-mono text-[10px]">Level H (30% ECC)</span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="w-56 h-56 flex items-center justify-center text-slate-400 text-xs">
+                    {isGenerating ? 'Generating QR...' : 'Failed to generate'}
+                  </div>
+                )}
               </div>
-              <div className="flex items-center justify-between gap-2">
-                <p className="font-mono text-xs text-indigo-300 truncate flex-1">{profileUrl}</p>
-                <div className="flex items-center gap-1 shrink-0">
-                  <button
-                    type="button"
-                    onClick={handleCopyLink}
-                    className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
-                    title="Copy Profile URL"
-                  >
-                    {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  </button>
-                  <a
-                    href={profileUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
-                    title="Open public profile in new tab"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
+
+              {/* Avatar Badge Toggle */}
+              <label className="flex items-center gap-2 mt-4 text-xs text-slate-300 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showAvatarBadge}
+                  onChange={(e) => setShowAvatarBadge(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0 cursor-pointer"
+                />
+                <span>Include Profile Avatar in QR Center</span>
+              </label>
+
+              {/* Destination URL Box with Quick Copy & Open */}
+              <div className="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-left space-y-2 mt-4">
+                <div className="flex items-center justify-between text-[11px] text-slate-400">
+                  <span className="font-semibold text-slate-300">Target Public Profile URL:</span>
+                  <span className="text-indigo-400 font-mono text-[10px]">Level H (30% ECC)</span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-mono text-xs text-indigo-300 truncate flex-1">{profileUrl}</p>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleCopyLink}
+                      className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                      title="Copy Profile URL"
+                    >
+                      {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                    <a
+                      href={profileUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                      title="Open public profile in new tab"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* PNG Resolution Selector */}
-            <div className="w-full flex items-center justify-between pt-2 text-xs text-slate-400">
-              <span className="font-medium text-slate-300">PNG Resolution:</span>
-              <div className="flex items-center gap-1">
-                {[
-                  { label: '512px', val: 512 },
-                  { label: '1024px', val: 1024 },
-                  { label: '2048px (HD)', val: 2048 },
-                ].map((item) => (
-                  <button
-                    key={item.val}
-                    type="button"
-                    onClick={() => setResolution(item.val)}
-                    className={`px-2 py-1 rounded text-[11px] font-mono transition-colors cursor-pointer ${
-                      resolution === item.val
-                        ? 'bg-indigo-600 text-white font-bold'
-                        : 'bg-slate-800 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
+              {/* PNG Resolution Selector */}
+              <div className="w-full flex items-center justify-between pt-2 text-xs text-slate-400">
+                <span className="font-medium text-slate-300">PNG Resolution:</span>
+                <div className="flex items-center gap-1">
+                  {[
+                    { label: '512px', val: 512 },
+                    { label: '1024px', val: 1024 },
+                    { label: '2048px (HD)', val: 2048 },
+                  ].map((item) => (
+                    <button
+                      key={item.val}
+                      type="button"
+                      onClick={() => setResolution(item.val)}
+                      className={`px-2 py-1 rounded text-[11px] font-mono transition-colors cursor-pointer ${
+                        resolution === item.val
+                          ? 'bg-indigo-600 text-white font-bold'
+                          : 'bg-slate-800 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Quick Actions (QR Only) */}
+              <div className="w-full grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={handleDownloadPng}
+                  className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors border border-slate-700 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>QR Only (PNG)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadSvg}
+                  className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors border border-slate-700 cursor-pointer"
+                  title="Download scalable vector SVG for print shops"
+                >
+                  <Download className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Vector (SVG)</span>
+                </button>
+              </div>
+
+              {/* Copy Actions */}
+              <div className="w-full grid grid-cols-2 gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={handleCopyImage}
+                  className="py-2 px-3 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 text-xs font-medium flex items-center justify-center gap-1.5 border border-slate-800 transition-colors cursor-pointer"
+                >
+                  {copiedImage ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedImage ? 'Copied QR!' : 'Copy QR'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleCopyLink}
+                  className="py-2 px-3 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 text-xs font-medium flex items-center justify-center gap-1.5 border border-slate-800 transition-colors cursor-pointer"
+                >
+                  {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedLink ? 'Copied URL!' : 'Copy URL'}</span>
+                </button>
               </div>
             </div>
 
-            {/* Quick Actions (QR Only) */}
-            <div className="w-full grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-slate-800">
-              <button
-                type="button"
-                onClick={handleDownloadPng}
-                className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors border border-slate-700 cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5 text-indigo-400" />
-                <span>QR Only (PNG)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleDownloadSvg}
-                className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors border border-slate-700 cursor-pointer"
-                title="Download scalable vector SVG for print shops"
-              >
-                <Download className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Vector (SVG)</span>
-              </button>
-            </div>
-
-            {/* Copy Actions */}
-            <div className="w-full grid grid-cols-2 gap-2 mt-2">
-              <button
-                type="button"
-                onClick={handleCopyImage}
-                className="py-2 px-3 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 text-xs font-medium flex items-center justify-center gap-1.5 border border-slate-800 transition-colors cursor-pointer"
-              >
-                {copiedImage ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copiedImage ? 'Copied QR!' : 'Copy QR'}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleCopyLink}
-                className="py-2 px-3 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 text-xs font-medium flex items-center justify-center gap-1.5 border border-slate-800 transition-colors cursor-pointer"
-              >
-                {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copiedLink ? 'Copied URL!' : 'Copy URL'}</span>
-              </button>
-            </div>
-
-            {/* Offline Print Recommendation Card (Consolidated from Offline Sharing Modal) */}
-            <div className="w-full bg-indigo-950/20 border border-indigo-500/20 rounded-xl p-3.5 text-left mt-3">
+            {/* Offline Print Recommendation Card */}
+            <div className="w-full bg-indigo-950/20 border border-indigo-500/20 rounded-xl p-3.5 text-left mt-4">
               <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-300 mb-1">
                 <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
                 <span>Offline Print Recommendation</span>
@@ -479,8 +484,8 @@ export const QrCodeTab: React.FC<QrCodeTabProps> = ({ profile, onViewPublicProfi
         </div>
 
         {/* Right Column: Printable Poster / Table-Tent Flyer Preview (7 cols) */}
-        <div className="lg:col-span-7 space-y-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+        <div className="lg:col-span-7 flex flex-col h-full">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col h-full flex-1 justify-between space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3 print-hidden">
               <div className="flex items-center gap-2">
                 <FileImage className="w-4 h-4 text-indigo-400" />
@@ -522,7 +527,7 @@ export const QrCodeTab: React.FC<QrCodeTabProps> = ({ profile, onViewPublicProfi
               <div className="mt-3 mb-2 flex flex-col items-center">
                 <div className="w-20 h-20 rounded-full border-4 border-slate-100 shadow-md overflow-hidden mb-3">
                   <img
-                    src={profile.avatar_url || '/avatar-silvio.png'}
+                    src={profile.avatar_url || '/icon.svg'}
                     alt={profile.display_name}
                     className="w-full h-full object-cover"
                   />

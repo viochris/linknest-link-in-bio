@@ -85,7 +85,7 @@ const createResilientProfile = (usr: AuthUser): Profile => {
     username: cleanUsername,
     display_name: usr.email?.split('@')[0] || 'LinkNest Creator',
     bio: 'Welcome to my LinkNest! Discover all my links below.',
-    avatar_url: '/avatar-silvio.png',
+    avatar_url: '/icon.svg',
     theme: { ...SEED_PROFILE_SILVIO.theme },
     view_count: 0,
     created_at: new Date().toISOString(),
@@ -253,11 +253,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         } catch {}
       }
 
-      // Check for locally saved profile adjustments (custom theme, display name, bio)
+      // Check for locally saved profile adjustments scoped strictly to this specific profile ID
       try {
-        const savedCustom =
-          localStorage.getItem('linknest_custom_profile_' + profileData.id) ||
-          localStorage.getItem('linknest_saved_profile');
+        const savedCustom = localStorage.getItem('linknest_custom_profile_' + profileData.id);
         if (savedCustom) {
           const parsed = JSON.parse(savedCustom);
           if (parsed && typeof parsed === 'object') {
@@ -543,7 +541,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         aria-label="Your Public Page"
         className="bg-slate-900/80 border-b border-slate-800/80 px-3 sm:px-6 py-3.5 sm:py-4 shadow-sm"
       >
-        <div className="max-w-6xl mx-auto flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 sm:gap-4">
+        <div className="max-w-6xl mx-auto flex flex-col xl:flex-row xl:items-center justify-between gap-3.5 sm:gap-4">
           {/* Left: Indicator & Guidance */}
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-2xl bg-indigo-600/15 border border-indigo-500/25 flex items-center justify-center text-indigo-400 shrink-0 shadow-inner">
@@ -554,19 +552,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <h2 className="text-sm font-bold text-white tracking-tight">
                   Your Public Page
                 </h2>
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 whitespace-nowrap">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   Live &amp; Shareable
                 </span>
               </div>
-              <p className="text-xs text-slate-400 truncate mt-0.5">
+              <p className="text-xs text-slate-400 truncate mt-0.5 max-w-md">
                 Share this link in your Instagram bio, WhatsApp, TikTok, or business cards.
               </p>
             </div>
           </div>
 
           {/* Right: URL Input & Actions */}
-          <div className="relative flex flex-wrap items-center gap-2 sm:gap-2.5 min-w-0">
+          <div className="relative flex items-center gap-2 sm:gap-2.5 min-w-0 flex-wrap sm:flex-nowrap">
             {/* Inline 'Copied!' Toast Notification positioned above the share link field */}
             <AnimatePresence>
               {copied && (
@@ -590,7 +588,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div
               onClick={handleCopyPublicUrl}
               title="Click to copy public URL"
-              className="flex items-center bg-slate-950 border border-slate-800 hover:border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-indigo-300 min-w-0 max-w-full sm:max-w-xs md:max-w-sm shadow-inner cursor-pointer group transition-colors"
+              className="flex items-center bg-slate-950 border border-slate-800 hover:border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-indigo-300 min-w-0 max-w-[200px] sm:max-w-[220px] md:max-w-[260px] shadow-inner cursor-pointer group transition-colors shrink"
             >
               <span className="text-slate-500 select-none mr-1.5 group-hover:text-slate-400">url:</span>
               <span className="truncate select-all text-white font-medium group-hover:text-indigo-200">{publicUrl}</span>
@@ -601,7 +599,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               id="copy-link-btn"
               type="button"
               onClick={handleCopyPublicUrl}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/80 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer min-h-[38px] active:scale-95"
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/80 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer min-h-[38px] active:scale-95 shrink-0 whitespace-nowrap"
               title="Copy public link to clipboard"
             >
               {copied ? (
@@ -622,7 +620,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               id="share-profile-btn"
               type="button"
               onClick={handleOpenShareModal}
-              className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-indigo-600/25 cursor-pointer min-h-[38px] active:scale-95"
+              className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-indigo-600/25 cursor-pointer min-h-[38px] active:scale-95 shrink-0 whitespace-nowrap"
               title="Share profile to WhatsApp, X, LinkedIn, and more"
             >
               <Share2 className="w-3.5 h-3.5" />
@@ -634,7 +632,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               id="preview-public-page-btn"
               type="button"
               onClick={() => onViewPublicProfile(activeProfile.username)}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/80 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer min-h-[38px] active:scale-95"
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/80 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer min-h-[38px] active:scale-95 shrink-0 whitespace-nowrap"
               title="Open your public bio page in this app"
             >
               <ExternalLink className="w-3.5 h-3.5 text-slate-400" />

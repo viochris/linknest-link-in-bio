@@ -52,6 +52,16 @@ const DEFAULT_SILVIO_PROFILE: ServerProfileMeta = {
   showDiscoverTab: true,
 };
 
+const DEFAULT_DEMO_PROFILE: ServerProfileMeta = {
+  username: 'demo',
+  displayName: 'Alex Rivera',
+  bio: 'Creative Technologist & UI Engineer ✨\nExploring AI-powered design systems, WebGL interactions, and modern web products.',
+  avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
+  accentColor: '#818cf8',
+  linksCount: 5,
+  showDiscoverTab: true,
+};
+
 async function getProfileForRoute(rawUsername?: string): Promise<ServerProfileMeta> {
   const username = (rawUsername || 'silvio').toLowerCase().trim();
 
@@ -93,6 +103,10 @@ async function getProfileForRoute(rawUsername?: string): Promise<ServerProfileMe
 
   if (username === 'silvio') {
     return DEFAULT_SILVIO_PROFILE;
+  }
+
+  if (username === 'demo') {
+    return DEFAULT_DEMO_PROFILE;
   }
 
   return {
@@ -1136,8 +1150,62 @@ URL: <direct or web destination URL>
   }
 }
 
+// Curated pool of high-quality trending resources used when live search grounding needs fallback
+const CURATED_DISCOVER_RESOURCES: DiscoverItem[] = [
+  {
+    id: 'curated-ai-01',
+    title: 'Hugging Face Open LLM Leaderboard & Benchmarks',
+    source: 'Hugging Face',
+    snippet: 'Tracking, ranking, and evaluating open-source Large Language Models and multimodal reasoning agents.',
+    url: 'https://huggingface.co/spaces/open-llm-leaderboard/open_llm_leaderboard',
+  },
+  {
+    id: 'curated-ai-02',
+    title: 'Google DeepMind Research & Gemini Architecture Breakthroughs',
+    source: 'Google DeepMind',
+    snippet: 'Exploring foundational intelligence, multimodality advancements, and frontier AI reasoning benchmarks.',
+    url: 'https://deepmind.google/discover/blog/',
+  },
+  {
+    id: 'curated-web-01',
+    title: 'GitHub Trending: Most Starred Open-Source Repositories',
+    source: 'GitHub',
+    snippet: 'Discover the codebases, developer tools, and libraries capturing the global developer community this week.',
+    url: 'https://github.com/trending',
+  },
+  {
+    id: 'curated-web-02',
+    title: 'Modern Web Standards & Cross-Browser Baseline',
+    source: 'Web.dev',
+    snippet: 'Comprehensive guide to modern cross-browser CSS container queries, subgrid, and performance best practices.',
+    url: 'https://web.dev/explore/baseline',
+  },
+  {
+    id: 'curated-tech-01',
+    title: 'Hacker News: Top Software Engineering & Tech Discussions',
+    source: 'Y Combinator',
+    snippet: 'Curated tech industry news, startup engineering post-mortems, and developer community insights.',
+    url: 'https://news.ycombinator.com',
+  },
+  {
+    id: 'curated-tech-02',
+    title: 'Kaggle Machine Learning Competitions & Open Benchmarks',
+    source: 'Kaggle',
+    snippet: 'Explore competitive data science benchmarks, exploratory notebooks, and open model weights.',
+    url: 'https://www.kaggle.com/competitions',
+  },
+  {
+    id: 'curated-ui-01',
+    title: 'Modern UI Components & Fluid Interaction Patterns',
+    source: 'Tailwind Labs',
+    snippet: 'Production-ready responsive layouts, fluid typography, and accessible micro-interaction design patterns.',
+    url: 'https://tailwindcss.com/blog',
+  },
+];
+
 app.get('/api/discover', async (req, res) => {
   const username = String(req.query.username || 'silvio').toLowerCase().trim();
+  const forceRefresh = req.query.refresh === 'true' || req.query.refresh === '1';
 
   try {
     // 1. Fetch profile metadata to verify status, bio, and owner settings
@@ -1154,10 +1222,16 @@ app.get('/api/discover', async (req, res) => {
       });
     }
 
-    // 3. Check server-side cache (12-hour TTL)
+    // 3. Purge cache on forced refresh request
+    if (forceRefresh) {
+      discoverCache.delete(username);
+      discoverInFlight.delete(username);
+    }
+
+    // 4. Check server-side cache (12-hour TTL) unless force refreshing
     const cached = discoverCache.get(username);
     const now = Date.now();
-    if (cached && now - cached.timestamp < DISCOVER_CACHE_TTL_MS) {
+    if (!forceRefresh && cached && now - cached.timestamp < DISCOVER_CACHE_TTL_MS) {
       return res.json({
         success: true,
         enabled: true,
@@ -1169,8 +1243,8 @@ app.get('/api/discover', async (req, res) => {
       });
     }
 
-    // 4. Rate-limit & coalesce concurrent in-flight requests per profile
-    if (discoverInFlight.has(username)) {
+    // 5. Rate-limit & coalesce concurrent in-flight requests per profile
+    if (!forceRefresh && discoverInFlight.has(username)) {
       const existingResult = await discoverInFlight.get(username)!;
       return res.json({
         success: true,
@@ -1181,13 +1255,23 @@ app.get('/api/discover', async (req, res) => {
       });
     }
 
-    // 5. Extract sanitized keywords from the owner's bio (never pass raw un-sanitized bio)
+    // 6. Extract sanitized keywords from the owner's bio
     const topics = extractSanitizedBioKeywords(profile.bio);
 
-    // 6. Launch ground search as coalesced promise
+    // 7. Launch ground search as coalesced promise
     const searchPromise = (async () => {
       try {
-        const items = await queryGoogleSearchGrounding(topics, username);
+        let items = await queryGoogleSearchGrounding(topics, username);
+        // If grounding search returned 0 items (e.g. offline, rate-limited, or no API key),
+        // supply curated real trending tech resources, shuffled so refresh provides fresh items!
+        if (items.length === 0) {
+          const shuffled = [...CURATED_DISCOVER_RESOURCES].sort(() => 0.5 - Math.random());
+          items = shuffled.slice(0, 4).map((c, i) => ({
+            ...c,
+            id: `disc-${username}-curated-${i}-${Date.now()}`,
+          }));
+        }
+
         if (items.length > 0) {
           discoverCache.set(username, {
             timestamp: Date.now(),
@@ -1211,18 +1295,20 @@ app.get('/api/discover', async (req, res) => {
       topics: result.topics,
       cached: false,
       empty: result.items.length === 0,
+      refreshed: forceRefresh,
       message: result.items.length === 0 ? 'Nothing to discover right now' : undefined,
     });
   } catch (err: any) {
     console.warn(`[Discover] Unexpected handler error for @${username}:`, err.message || err);
-    // Gracefully return empty state instead of crashing or returning 500
+    // Gracefully provide fallback curated items
+    const shuffled = [...CURATED_DISCOVER_RESOURCES].sort(() => 0.5 - Math.random()).slice(0, 4);
     return res.json({
       success: true,
       enabled: true,
-      items: [],
-      topics: [],
-      empty: true,
-      message: 'Nothing to discover right now',
+      items: shuffled,
+      topics: ['Technology', 'Software Engineering', 'AI & Web'],
+      empty: false,
+      message: undefined,
     });
   }
 });
