@@ -7,7 +7,6 @@ import { resolveLinkIcon } from '../../lib/domainIcons';
 import { AddEditLinkModal } from './AddEditLinkModal';
 import {
   Plus,
-  GripVertical,
   Edit2,
   Trash2,
   Sparkles,
@@ -54,7 +53,6 @@ export const ManageLinksTab: React.FC<ManageLinksTabProps> = ({
   const [selectedLinkIds, setSelectedLinkIds] = useState<string[]>([]);
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
-  const [draggedLinkId, setDraggedLinkId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [generatingAiId, setGeneratingAiId] = useState<string | null>(null);
@@ -82,29 +80,33 @@ export const ManageLinksTab: React.FC<ManageLinksTabProps> = ({
     }
 
     const updatedStatus = !link.is_active;
-    try {
-      const { error } = await supabase
-        .from('links')
-        .update({ is_active: updatedStatus, ...(updatedStatus ? { is_archived: false } : {}) })
-        .eq('id', link.id);
+    const payload = {
+      is_active: updatedStatus,
+      ...(updatedStatus ? { is_archived: false } : {}),
+    };
 
-      if (error) {
-        throw error;
-      }
-
-      try {
-        await localSimulator.from('links').update({ is_active: updatedStatus, ...(updatedStatus ? { is_archived: false } : {}) }).eq('id', link.id);
-      } catch {}
-
-      setLinks((prev) =>
-        prev.map((l) => (l.id === link.id ? { ...l, is_active: updatedStatus, ...(updatedStatus ? { is_archived: false } : {}) } : l))
+    // 1. Instant optimistic update to state & localStorage
+    setLinks((prev) => {
+      const next = prev.map((l) =>
+        l.id === link.id ? { ...l, ...payload } : l
       );
-      showToast(updatedStatus ? 'Link is now visible publicly.' : 'Link is now hidden.');
-      onLinksUpdated();
-    } catch (err: any) {
-      console.error('Failed toggling active:', err);
-      showToast('Failed to update link status.');
+      try {
+        localStorage.setItem('linknest_saved_links_' + profile.id, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    showToast(updatedStatus ? 'Link is now live and visible.' : 'Link is now hidden.');
+
+    // 2. Background database sync
+    try {
+      await supabase.from('links').update(payload).eq('id', link.id);
+    } catch (e) {
+      console.warn('Supabase toggle active warning:', e);
     }
+    try {
+      await localSimulator.from('links').update(payload).eq('id', link.id);
+    } catch {}
   };
 
   // Toggle is_featured
@@ -116,29 +118,29 @@ export const ManageLinksTab: React.FC<ManageLinksTabProps> = ({
     }
 
     const updatedStatus = !link.is_featured;
-    try {
-      const { error } = await supabase
-        .from('links')
-        .update({ is_featured: updatedStatus })
-        .eq('id', link.id);
 
-      if (error) {
-        throw error;
-      }
-
-      try {
-        await localSimulator.from('links').update({ is_featured: updatedStatus }).eq('id', link.id);
-      } catch {}
-
-      setLinks((prev) =>
-        prev.map((l) => (l.id === link.id ? { ...l, is_featured: updatedStatus } : l))
+    // 1. Instant optimistic update to state & localStorage
+    setLinks((prev) => {
+      const next = prev.map((l) =>
+        l.id === link.id ? { ...l, is_featured: updatedStatus } : l
       );
-      showToast(updatedStatus ? 'Link marked as featured at the top!' : 'Featured removed.');
-      onLinksUpdated();
-    } catch (err: any) {
-      console.error('Failed toggling featured:', err);
-      showToast('Failed to update featured status.');
+      try {
+        localStorage.setItem('linknest_saved_links_' + profile.id, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    showToast(updatedStatus ? 'Link marked as Featured!' : 'Featured status removed.');
+
+    // 2. Background database sync
+    try {
+      await supabase.from('links').update({ is_featured: updatedStatus }).eq('id', link.id);
+    } catch (e) {
+      console.warn('Supabase toggle featured warning:', e);
     }
+    try {
+      await localSimulator.from('links').update({ is_featured: updatedStatus }).eq('id', link.id);
+    } catch {}
   };
 
   // Single link deletion
@@ -161,7 +163,13 @@ export const ManageLinksTab: React.FC<ManageLinksTabProps> = ({
         await localSimulator.from('links').delete().eq('id', linkId);
       } catch {}
 
-      setLinks((prev) => prev.filter((l) => l.id !== linkId));
+      setLinks((prev) => {
+        const next = prev.filter((l) => l.id !== linkId);
+        try {
+          localStorage.setItem('linknest_saved_links_' + profile.id, JSON.stringify(next));
+        } catch {}
+        return next;
+      });
       setSelectedLinkIds((prev) => prev.filter((id) => id !== linkId));
       showToast('Link deleted successfully.');
       onLinksUpdated();
@@ -173,137 +181,132 @@ export const ManageLinksTab: React.FC<ManageLinksTabProps> = ({
   };
 
   // Bulk Toggle Active Status
-  const handleBulkToggleActive = async (newActiveState: boolean) => {
+  const handleBulkToggleActive = (newActiveState: boolean) => {
     if (selectedLinkIds.length === 0) return;
-    setIsBulkProcessing(true);
+    const targetIds = [...selectedLinkIds];
+    const payload = {
+      is_active: newActiveState,
+      ...(newActiveState ? { is_archived: false } : {}),
+    };
 
-    try {
-      const payload = {
-        is_active: newActiveState,
-        ...(newActiveState ? { is_archived: false } : {}),
-      };
+    // 1. Optimistic instant React state update & local persistence
+    setLinks((prev) => {
+      const next = prev.map((l) =>
+        targetIds.includes(l.id) ? { ...l, ...payload } : l
+      );
+      try {
+        localStorage.setItem('linknest_saved_links_' + profile.id, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
 
-      const { error } = await supabase
-        .from('links')
-        .update(payload)
-        .in('id', selectedLinkIds);
+    showToast(
+      `✓ ${targetIds.length} link${targetIds.length > 1 ? 's' : ''} set to ${
+        newActiveState ? 'Live' : 'Hidden'
+      }.`
+    );
+    setSelectedLinkIds([]);
+    setIsSelectionMode(false);
+    setIsBulkProcessing(false);
 
-      if (error) {
-        console.warn('Supabase bulk update warning:', error);
-      }
+    // 2. Silent background sync
+    (async () => {
+      try {
+        await supabase
+          .from('links')
+          .update(payload)
+          .in('id', targetIds);
+      } catch {}
 
-      for (const id of selectedLinkIds) {
+      for (const id of targetIds) {
         try {
           await localSimulator.from('links').update(payload).eq('id', id);
         } catch {}
       }
-
-      setLinks((prev) =>
-        prev.map((l) =>
-          selectedLinkIds.includes(l.id)
-            ? { ...l, ...payload }
-            : l
-        )
-      );
-
-      showToast(
-        `✓ ${selectedLinkIds.length} link${selectedLinkIds.length > 1 ? 's' : ''} set to ${
-          newActiveState ? 'Live (Active)' : 'Hidden (Inactive)'
-        }.`
-      );
-      setSelectedLinkIds([]);
-      setIsSelectionMode(false);
-      onLinksUpdated();
-    } catch (err: any) {
-      console.error('Bulk toggle active error:', err);
-      showToast('Failed to update link statuses in bulk.');
-    } finally {
-      setIsBulkProcessing(false);
-    }
+    })();
   };
 
   // Bulk Archive / Restore
-  const handleBulkArchive = async (archive: boolean = true) => {
+  const handleBulkArchive = (archive: boolean = true) => {
     if (selectedLinkIds.length === 0) return;
-    setIsBulkProcessing(true);
+    const targetIds = [...selectedLinkIds];
+    const payload = archive
+      ? { is_archived: true, is_active: false }
+      : { is_archived: false, is_active: true };
 
-    try {
-      const payload = archive
-        ? { is_archived: true, is_active: false }
-        : { is_archived: false, is_active: true };
+    // 1. Optimistic instant React state update & local persistence
+    setLinks((prev) => {
+      const next = prev.map((l) =>
+        targetIds.includes(l.id) ? { ...l, ...payload } : l
+      );
+      try {
+        localStorage.setItem('linknest_saved_links_' + profile.id, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
 
-      const { error } = await supabase
-        .from('links')
-        .update(payload)
-        .in('id', selectedLinkIds);
+    showToast(
+      `✓ ${targetIds.length} link${targetIds.length > 1 ? 's' : ''} ${
+        archive ? 'archived' : 'restored'
+      }.`
+    );
+    setSelectedLinkIds([]);
+    setIsSelectionMode(false);
+    setIsBulkProcessing(false);
 
-      if (error) {
-        console.warn('Supabase bulk archive warning:', error);
-      }
+    // 2. Silent background sync
+    (async () => {
+      try {
+        await supabase
+          .from('links')
+          .update(payload)
+          .in('id', targetIds);
+      } catch {}
 
-      for (const id of selectedLinkIds) {
+      for (const id of targetIds) {
         try {
           await localSimulator.from('links').update(payload).eq('id', id);
         } catch {}
       }
-
-      setLinks((prev) =>
-        prev.map((l) =>
-          selectedLinkIds.includes(l.id) ? { ...l, ...payload } : l
-        )
-      );
-
-      showToast(
-        `✓ ${selectedLinkIds.length} link${selectedLinkIds.length > 1 ? 's' : ''} ${
-          archive ? 'archived' : 'restored'
-        }.`
-      );
-      setSelectedLinkIds([]);
-      setIsSelectionMode(false);
-      onLinksUpdated();
-    } catch (err: any) {
-      console.error('Bulk archive error:', err);
-      showToast('Failed to archive links in bulk.');
-    } finally {
-      setIsBulkProcessing(false);
-    }
+    })();
   };
 
   // Bulk Delete
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     if (selectedLinkIds.length === 0) return;
-    setIsBulkProcessing(true);
+    const targetIds = [...selectedLinkIds];
+    const count = targetIds.length;
 
-    try {
-      const count = selectedLinkIds.length;
+    // 1. Optimistic instant React state update & local persistence
+    setLinks((prev) => {
+      const next = prev.filter((l) => !targetIds.includes(l.id));
+      try {
+        localStorage.setItem('linknest_saved_links_' + profile.id, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
 
-      const { error } = await supabase
-        .from('links')
-        .delete()
-        .in('id', selectedLinkIds);
+    setSelectedLinkIds([]);
+    setIsSelectionMode(false);
+    setShowBulkDeleteConfirm(false);
+    setIsBulkProcessing(false);
+    showToast(`✓ Successfully deleted ${count} link${count > 1 ? 's' : ''}.`);
 
-      if (error) {
-        console.warn('Supabase bulk delete warning:', error);
-      }
+    // 2. Silent background sync
+    (async () => {
+      try {
+        await supabase
+          .from('links')
+          .delete()
+          .in('id', targetIds);
+      } catch {}
 
-      for (const id of selectedLinkIds) {
+      for (const id of targetIds) {
         try {
           await localSimulator.from('links').delete().eq('id', id);
         } catch {}
       }
-
-      setLinks((prev) => prev.filter((l) => !selectedLinkIds.includes(l.id)));
-      setSelectedLinkIds([]);
-      setIsSelectionMode(false);
-      setShowBulkDeleteConfirm(false);
-      showToast(`✓ Successfully deleted ${count} link${count > 1 ? 's' : ''}.`);
-      onLinksUpdated();
-    } catch (err: any) {
-      console.error('Bulk delete error:', err);
-      showToast('Failed to delete links in bulk.');
-    } finally {
-      setIsBulkProcessing(false);
-    }
+    })();
   };
 
   // Quick Generate with Gemini API for an existing link
@@ -413,7 +416,13 @@ export const ManageLinksTab: React.FC<ManageLinksTabProps> = ({
         } catch {}
 
         // 3. Update React state
-        setLinks((prev) => prev.map((l) => (l.id === finalLink.id ? finalLink : l)));
+        setLinks((prev) => {
+          const next = prev.map((l) => (l.id === finalLink.id ? finalLink : l));
+          try {
+            localStorage.setItem('linknest_saved_links_' + profile.id, JSON.stringify(next));
+          } catch {}
+          return next;
+        });
         showToast('Link updated successfully.');
       } else {
         // 1. Insert in Supabase
@@ -431,7 +440,13 @@ export const ManageLinksTab: React.FC<ManageLinksTabProps> = ({
         } catch {}
 
         // 3. Add to React state
-        setLinks((prev) => [...prev, finalLink]);
+        setLinks((prev) => {
+          const next = [...prev, finalLink];
+          try {
+            localStorage.setItem('linknest_saved_links_' + profile.id, JSON.stringify(next));
+          } catch {}
+          return next;
+        });
         showToast('New link added successfully.');
       }
 
@@ -449,90 +464,58 @@ export const ManageLinksTab: React.FC<ManageLinksTabProps> = ({
     }
   };
 
-  // Drag and drop reordering
-  const handleDragStart = (id: string) => {
-    setDraggedLinkId(id);
-  };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const handleDrop = async (targetId: string) => {
-    if (!draggedLinkId || draggedLinkId === targetId) return;
-
-    const sourceIndex = links.findIndex((l) => l.id === draggedLinkId);
-    const targetIndex = links.findIndex((l) => l.id === targetId);
-
-    if (sourceIndex === -1 || targetIndex === -1) return;
-
-    const newLinks = [...links];
-    const [movedLink] = newLinks.splice(sourceIndex, 1);
-    newLinks.splice(targetIndex, 0, movedLink);
-
-    const reordered = newLinks.map((link, idx) => ({
-      ...link,
-      position: idx,
-    }));
-
-    setLinks(reordered);
-    setDraggedLinkId(null);
-
-    try {
-      await Promise.all(
-        reordered.map((l) =>
-          supabase.from('links').update({ position: l.position }).eq('id', l.id)
-        )
-      );
-      try {
-        await Promise.all(
-          reordered.map((l) =>
-            localSimulator.from('links').update({ position: l.position }).eq('id', l.id)
-          )
-        );
-      } catch {}
-      onLinksUpdated();
-    } catch (err) {
-      console.warn('Reorder position warning:', err);
-    }
-  };
-
-  const handleDragEnd = () => {
-    setDraggedLinkId(null);
-  };
 
   // Move up/down single position
-  const handleMove = async (linkId: string, direction: 'up' | 'down') => {
-    const currentIndex = links.findIndex((l) => l.id === linkId);
-    if (currentIndex === -1) return;
+  const handleMove = (linkId: string, direction: 'up' | 'down') => {
+    const visibleIndex = filteredLinks.findIndex((l) => l.id === linkId);
+    if (visibleIndex === -1) return;
 
-    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-    if (targetIndex < 0 || targetIndex >= links.length) return;
+    const targetVisibleIndex = direction === 'up' ? visibleIndex - 1 : visibleIndex + 1;
+    if (targetVisibleIndex < 0 || targetVisibleIndex >= filteredLinks.length) return;
+
+    const currentLink = filteredLinks[visibleIndex];
+    const targetLink = filteredLinks[targetVisibleIndex];
+
+    const currentIndex = links.findIndex((l) => l.id === currentLink.id);
+    const targetIndex = links.findIndex((l) => l.id === targetLink.id);
+    if (currentIndex === -1 || targetIndex === -1) return;
 
     const newLinks = [...links];
-    const temp = newLinks[currentIndex];
-    newLinks[currentIndex] = newLinks[targetIndex];
-    newLinks[targetIndex] = temp;
+    newLinks[currentIndex] = targetLink;
+    newLinks[targetIndex] = currentLink;
 
     const reordered = newLinks.map((link, idx) => ({
       ...link,
       position: idx,
     }));
 
+    // Instant UI update
     setLinks(reordered);
+    showToast(direction === 'up' ? 'Moved link up.' : 'Moved link down.');
 
+    // Save directly to localStorage for this profile so it is never lost or clobbered
     try {
-      await Promise.all(
-        reordered.map(async (l) => {
-          await supabase.from('links').update({ position: l.position }).eq('id', l.id);
-          try {
-            await localSimulator.from('links').update({ position: l.position }).eq('id', l.id);
-          } catch {}
-        })
-      );
-    } catch (err) {
-      console.warn('Position update warning:', err);
-    }
+      localStorage.setItem('linknest_saved_links_' + profile.id, JSON.stringify(reordered));
+    } catch {}
+
+    // Background database sync (silent, without refetching and clobbering state)
+    (async () => {
+      try {
+        await Promise.all(
+          reordered.map(async (l) => {
+            try {
+              await supabase.from('links').update({ position: l.position }).eq('id', l.id);
+            } catch {}
+            try {
+              await localSimulator.from('links').update({ position: l.position }).eq('id', l.id);
+            } catch {}
+          })
+        );
+      } catch (err) {
+        console.warn('Reorder sync note:', err);
+      }
+    })();
   };
 
   // Filtering: search query + status tabs
@@ -805,8 +788,10 @@ export const ManageLinksTab: React.FC<ManageLinksTabProps> = ({
                   )}
                 </div>
 
-                <div className="text-[11px] text-slate-500 hidden sm:block">
-                  Drag <GripVertical className="w-3 h-3 inline text-slate-600" /> to reorder priority
+                <div className="text-[11px] text-slate-400 hidden sm:flex items-center gap-1.5 font-medium">
+                  <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 text-[10px]">↑</span>
+                  <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 text-[10px]">↓</span>
+                  <span>Use arrows to reorder links</span>
                 </div>
               </div>
             )
@@ -981,15 +966,8 @@ export const ManageLinksTab: React.FC<ManageLinksTabProps> = ({
               <div
                 key={link.id}
                 id={`dashboard-link-row-${link.id}`}
-                draggable
-                onDragStart={() => handleDragStart(link.id)}
-                onDragOver={handleDragOver}
-                onDrop={() => handleDrop(link.id)}
-                onDragEnd={handleDragEnd}
                 className={`bg-slate-900 border rounded-2xl p-4 transition-all ${
-                  draggedLinkId === link.id
-                    ? 'border-indigo-500 shadow-xl bg-slate-800/80 scale-[1.01]'
-                    : isSelected
+                  isSelected
                     ? 'border-indigo-500/80 bg-indigo-950/20 shadow-md shadow-indigo-950/30'
                     : 'border-slate-800 hover:border-slate-700'
                 } ${!link.is_active ? 'opacity-65' : ''}`}
@@ -1013,12 +991,38 @@ export const ManageLinksTab: React.FC<ManageLinksTabProps> = ({
                       </button>
                     )}
 
-                    {/* Drag Handle */}
-                    <div
-                      className="cursor-grab active:cursor-grabbing text-slate-500 hover:text-slate-300 p-1 rounded hover:bg-slate-800 touch-none shrink-0"
-                      title="Drag to reorder"
-                    >
-                      <GripVertical className="w-4 h-4" />
+                    {/* Up / Down Reorder Buttons (replaces the 6-dot drag handle) */}
+                    <div className="flex flex-col gap-1 shrink-0">
+                      <button
+                        type="button"
+                        id={`move-up-btn-${link.id}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          handleMove(link.id, 'up');
+                        }}
+                        disabled={filteredLinks.findIndex((l) => l.id === link.id) === 0}
+                        aria-label="Move link up"
+                        title="Move link up"
+                        className="w-7 h-6 rounded-md bg-slate-800 hover:bg-indigo-600 hover:text-white disabled:opacity-20 disabled:hover:bg-slate-800 disabled:hover:text-slate-400 text-slate-300 border border-slate-700/80 hover:border-indigo-500 transition-all cursor-pointer disabled:cursor-not-allowed flex items-center justify-center shadow-xs active:scale-95"
+                      >
+                        <ArrowUp className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        id={`move-down-btn-${link.id}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          handleMove(link.id, 'down');
+                        }}
+                        disabled={filteredLinks.findIndex((l) => l.id === link.id) === filteredLinks.length - 1}
+                        aria-label="Move link down"
+                        title="Move link down"
+                        className="w-7 h-6 rounded-md bg-slate-800 hover:bg-indigo-600 hover:text-white disabled:opacity-20 disabled:hover:bg-slate-800 disabled:hover:text-slate-400 text-slate-300 border border-slate-700/80 hover:border-indigo-500 transition-all cursor-pointer disabled:cursor-not-allowed flex items-center justify-center shadow-xs active:scale-95"
+                      >
+                        <ArrowDown className="w-3.5 h-3.5" />
+                      </button>
                     </div>
 
                     {/* Icon with domain auto-detection */}
@@ -1113,35 +1117,20 @@ export const ManageLinksTab: React.FC<ManageLinksTabProps> = ({
                     </div>
                   </div>
 
-                  {/* Quick Reorder Up/Down arrows */}
-                  <div className="hidden sm:flex flex-col gap-0.5 text-slate-500 shrink-0">
-                    <button
-                      id={`move-up-btn-${link.id}`}
-                      onClick={() => handleMove(link.id, 'up')}
-                      disabled={links.findIndex((l) => l.id === link.id) === 0}
-                      className="p-1 hover:text-white disabled:opacity-20 hover:bg-slate-800 rounded min-h-[22px] cursor-pointer"
-                      title="Move up"
-                    >
-                      <ArrowUp className="w-3 h-3" />
-                    </button>
-                    <button
-                      id={`move-down-btn-${link.id}`}
-                      onClick={() => handleMove(link.id, 'down')}
-                      disabled={links.findIndex((l) => l.id === link.id) === links.length - 1}
-                      className="p-1 hover:text-white disabled:opacity-20 hover:bg-slate-800 rounded min-h-[22px] cursor-pointer"
-                      title="Move down"
-                    >
-                      <ArrowDown className="w-3 h-3" />
-                    </button>
-                  </div>
+
 
                   {/* Controls: Active toggle, Featured toggle, Edit, Delete */}
                   <div className="flex items-center justify-end gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/80">
                     {/* Featured Toggle Star */}
                     <button
+                      type="button"
                       id={`featured-toggle-${link.id}`}
-                      onClick={() => handleToggleFeatured(link)}
-                      className={`p-2 rounded-xl border transition-all min-h-[40px] min-w-[40px] flex items-center justify-center cursor-pointer ${
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        handleToggleFeatured(link);
+                      }}
+                      className={`p-2 rounded-xl border transition-all min-h-[40px] min-w-[40px] flex items-center justify-center cursor-pointer active:scale-95 ${
                         link.is_featured
                           ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                           : 'bg-slate-950 text-slate-500 border-slate-800 hover:text-amber-400 hover:border-slate-700'
@@ -1162,9 +1151,14 @@ export const ManageLinksTab: React.FC<ManageLinksTabProps> = ({
                         {link.is_archived ? 'Archived' : link.is_active ? 'Live' : 'Hidden'}
                       </span>
                       <button
+                        type="button"
                         id={`active-toggle-${link.id}`}
-                        onClick={() => handleToggleActive(link)}
-                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          handleToggleActive(link);
+                        }}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none active:scale-95 ${
                           link.is_active && !link.is_archived ? 'bg-emerald-600' : 'bg-slate-800'
                         }`}
                         title={link.is_active ? 'Status: LIVE (Click to hide)' : 'Status: HIDDEN (Click to make LIVE)'}

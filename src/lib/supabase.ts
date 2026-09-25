@@ -257,6 +257,67 @@ function getInitialDbState(): LocalDatabaseState {
           });
         }
 
+        // Silvio Christian's primary accounts: viochristian12@gmail.com and silvio@linknest.app
+        const isSilvioEmail = (em?: string) => {
+          if (!em) return false;
+          const clean = em.toLowerCase().trim();
+          return clean === 'viochristian12@gmail.com' || clean === 'silvio@linknest.app';
+        };
+
+        if (parsed.users && Array.isArray(parsed.users)) {
+          parsed.users = parsed.users.map((u: any) => {
+            if (u.email && !isSilvioEmail(u.email) && u.id === SEED_PROFILE_SILVIO.user_id) {
+              const cleanUname = u.email.split('@')[0].toLowerCase().replace(/[^a-z0-9_-]/g, '');
+              return { ...u, id: 'usr_' + cleanUname };
+            }
+            if (u.email && isSilvioEmail(u.email)) {
+              return { ...u, id: SEED_PROFILE_SILVIO.user_id };
+            }
+            return u;
+          });
+
+          // Ensure viochristian12@gmail.com is present in users with Silvio's user ID
+          if (!parsed.users.some((u: any) => u.email?.toLowerCase() === 'viochristian12@gmail.com')) {
+            parsed.users.push({
+              id: SEED_PROFILE_SILVIO.user_id,
+              email: 'viochristian12@gmail.com',
+              passwordHash: 'demo123',
+            });
+          }
+        }
+
+        // Ensure Silvio's profile is present and mapped to SEED_PROFILE_SILVIO
+        if (parsed.profiles && Array.isArray(parsed.profiles)) {
+          const silvioIdx = parsed.profiles.findIndex((p: any) => p.username?.toLowerCase() === 'silvio' || p.id === SEED_PROFILE_SILVIO.id);
+          if (silvioIdx >= 0) {
+            parsed.profiles[silvioIdx] = { ...SEED_PROFILE_SILVIO, ...parsed.profiles[silvioIdx], user_id: SEED_PROFILE_SILVIO.user_id };
+          } else {
+            parsed.profiles.push(SEED_PROFILE_SILVIO);
+          }
+        }
+
+        if (parsed.users && Array.isArray(parsed.users) && parsed.profiles && Array.isArray(parsed.profiles)) {
+          for (const u of parsed.users) {
+            if (u.id === SEED_PROFILE_SILVIO.user_id || u.id === SEED_PROFILE_DEMO.user_id) continue;
+            let existingProf = parsed.profiles.find((p: any) => p.user_id === u.id);
+            if (!existingProf) {
+              const uname = u.email.split('@')[0].toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'creator';
+              const newProf: Profile = {
+                id: 'prof_' + u.id,
+                user_id: u.id,
+                username: uname,
+                display_name: u.email.split('@')[0],
+                bio: 'Welcome to my LinkNest! 🌟',
+                avatar_url: '/icon.svg',
+                theme: { ...SEED_PROFILE_DEMO.theme },
+                view_count: 0,
+                created_at: new Date().toISOString(),
+              };
+              parsed.profiles.push(newProf);
+            }
+          }
+        }
+
         // Ensure link_clicks array is initialized
         if (!parsed.link_clicks || !Array.isArray(parsed.link_clicks) || parsed.link_clicks.length === 0) {
           parsed.link_clicks = generateHistoricalClicks(
@@ -281,11 +342,6 @@ function getInitialDbState(): LocalDatabaseState {
     social_icons: [...SEED_SOCIAL_SILVIO, ...SEED_SOCIAL_DEMO],
     link_clicks: initialClicks,
     users: [
-      {
-        id: SEED_PROFILE_SILVIO.user_id,
-        email: 'viochristian860@gmail.com',
-        passwordHash: 'demo123',
-      },
       {
         id: SEED_PROFILE_SILVIO.user_id,
         email: 'viochristian12@gmail.com',
@@ -375,7 +431,30 @@ class LocalSupabaseSimulator {
     try {
       const saved = localStorage.getItem(AUTH_STORAGE_KEY);
       if (saved) {
-        this.currentSession = JSON.parse(saved);
+        const session = JSON.parse(saved);
+        const isSilvioAccount = (em?: string) => {
+          if (!em) return false;
+          const clean = em.toLowerCase().trim();
+          return clean === 'viochristian12@gmail.com' || clean === 'silvio@linknest.app';
+        };
+
+        if (
+          session?.user &&
+          !isSilvioAccount(session.user.email) &&
+          session.user.id === SEED_PROFILE_SILVIO.user_id
+        ) {
+          const cleanUname = session.user.email.split('@')[0].toLowerCase().replace(/[^a-z0-9_-]/g, '');
+          session.user.id = 'usr_' + cleanUname;
+          localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
+        } else if (
+          session?.user &&
+          isSilvioAccount(session.user.email) &&
+          session.user.id !== SEED_PROFILE_SILVIO.user_id
+        ) {
+          session.user.id = SEED_PROFILE_SILVIO.user_id;
+          localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
+        }
+        this.currentSession = session;
       }
     } catch {
       this.currentSession = null;
@@ -474,15 +553,17 @@ class LocalSupabaseSimulator {
       };
     }
 
-    // Ensure user has their corresponding profile
-    let profile = this.db.profiles.find(p => p.user_id === user!.id);
-    if (!profile) {
-      const isSilvio =
-        cleanEmail === 'viochristian860@gmail.com' ||
-        cleanEmail === 'viochristian12@gmail.com' ||
-        cleanEmail === 'silvio@linknest.app';
-      const isDemo = cleanEmail === 'demo@linknest.app' || cleanEmail === 'demo@example.com';
+    const isSilvio = cleanEmail === 'viochristian12@gmail.com' || cleanEmail === 'silvio@linknest.app';
+    const isDemo = cleanEmail === 'demo@linknest.app' || cleanEmail === 'demo@example.com';
 
+    if (user && isSilvio && user.id !== SEED_PROFILE_SILVIO.user_id) {
+      user.id = SEED_PROFILE_SILVIO.user_id;
+      saveDbState(this.db);
+    }
+
+    // Ensure user has their corresponding profile
+    let profile = this.db.profiles.find(p => p.user_id === user!.id && (isSilvio ? (p.username === 'silvio' || p.id === SEED_PROFILE_SILVIO.id) : p.username !== 'silvio'));
+    if (!profile) {
       if (isSilvio) {
         profile = { ...SEED_PROFILE_SILVIO, user_id: user.id };
         this.db.profiles.push(profile);
@@ -498,7 +579,7 @@ class LocalSupabaseSimulator {
           display_name: cleanEmail.split('@')[0] || 'LinkNest Creator',
           bio: 'Welcome to my LinkNest! Discover all my links below.',
           avatar_url: '/icon.svg',
-          theme: { ...SEED_PROFILE_SILVIO.theme },
+          theme: { ...SEED_PROFILE_DEMO.theme },
           view_count: 0,
           created_at: new Date().toISOString(),
         };
@@ -621,14 +702,17 @@ class LocalSupabaseSimulator {
     let user = this.db.users.find(u => u.email.toLowerCase() === cleanEmail);
     if (!user) {
       const isKnownEmail =
-        cleanEmail === 'viochristian860@gmail.com' ||
         cleanEmail === 'viochristian12@gmail.com' ||
         cleanEmail === 'silvio@linknest.app' ||
         cleanEmail === 'demo@linknest.app' ||
         cleanEmail === 'demo@example.com';
       if (isKnownEmail) {
         user = {
-          id: cleanEmail.includes('demo') ? SEED_PROFILE_DEMO.user_id : SEED_PROFILE_SILVIO.user_id,
+          id: cleanEmail.includes('demo')
+            ? SEED_PROFILE_DEMO.user_id
+            : (cleanEmail === 'viochristian12@gmail.com' || cleanEmail === 'silvio@linknest.app')
+            ? SEED_PROFILE_SILVIO.user_id
+            : 'usr_' + cleanEmail.split('@')[0].replace(/[^a-z0-9_-]/g, ''),
           email: cleanEmail,
           passwordHash: 'demo123',
         };
@@ -652,14 +736,17 @@ class LocalSupabaseSimulator {
     let user = this.db.users.find(u => u.email.toLowerCase() === cleanEmail);
     if (!user) {
       const isKnownEmail =
-        cleanEmail === 'viochristian860@gmail.com' ||
         cleanEmail === 'viochristian12@gmail.com' ||
         cleanEmail === 'silvio@linknest.app' ||
         cleanEmail === 'demo@linknest.app' ||
         cleanEmail === 'demo@example.com';
       if (isKnownEmail) {
         user = {
-          id: cleanEmail.includes('demo') ? SEED_PROFILE_DEMO.user_id : SEED_PROFILE_SILVIO.user_id,
+          id: cleanEmail.includes('demo')
+            ? SEED_PROFILE_DEMO.user_id
+            : (cleanEmail === 'viochristian12@gmail.com' || cleanEmail === 'silvio@linknest.app')
+            ? SEED_PROFILE_SILVIO.user_id
+            : 'usr_' + cleanEmail.split('@')[0].replace(/[^a-z0-9_-]/g, ''),
           email: cleanEmail,
           passwordHash: newPassword,
         };
@@ -935,8 +1022,10 @@ class MockQueryBuilder {
       const field = this.orderField;
       const asc = this.orderAsc;
       result.sort((a, b) => {
-        if (a[field] < b[field]) return asc ? -1 : 1;
-        if (a[field] > b[field]) return asc ? 1 : -1;
+        const valA = a[field] ?? 0;
+        const valB = b[field] ?? 0;
+        if (valA < valB) return asc ? -1 : 1;
+        if (valA > valB) return asc ? 1 : -1;
         return 0;
       });
     }

@@ -125,17 +125,29 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
 
       // Query active links (RLS automatically enforces active and date windows for public)
       let activeLinks: LinkItem[] = [];
-      const { data: linksData } = await supabase
-        .from('links')
-        .select('*')
-        .eq('profile_id', profileData.id)
-        .order('position', { ascending: true });
+      const localSavedLinksStr = localStorage.getItem('linknest_saved_links_' + profileData.id);
+      if (localSavedLinksStr) {
+        try {
+          const parsed = JSON.parse(localSavedLinksStr);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            activeLinks = parsed.filter((l) => l.is_active && !l.is_archived);
+          }
+        } catch {}
+      }
 
-      if (linksData && linksData.length > 0) {
-        activeLinks = enrichLinksWithLocalDescriptions(linksData);
-      } else if ((cleanUsername === 'silvio' || cleanUsername === 'demo') && (!linksData || linksData.length === 0)) {
-        const localLinks = await localSimulator.from('links').select('*').eq('profile_id', profileData.id);
-        if (localLinks.data) activeLinks = enrichLinksWithLocalDescriptions(localLinks.data);
+      if (activeLinks.length === 0) {
+        const { data: linksData } = await supabase
+          .from('links')
+          .select('*')
+          .eq('profile_id', profileData.id)
+          .order('position', { ascending: true });
+
+        if (linksData && linksData.length > 0) {
+          activeLinks = enrichLinksWithLocalDescriptions(linksData);
+        } else if ((cleanUsername === 'silvio' || cleanUsername === 'demo') && (!linksData || linksData.length === 0)) {
+          const localLinks = await localSimulator.from('links').select('*').eq('profile_id', profileData.id).order('position', { ascending: true });
+          if (localLinks.data) activeLinks = enrichLinksWithLocalDescriptions(localLinks.data);
+        }
       }
       setLinks(enrichLinksWithLocalDescriptions(activeLinks));
 

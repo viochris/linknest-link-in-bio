@@ -30,13 +30,15 @@ export const AdminDashboardRoute: React.FC<AdminDashboardRouteProps> = ({
       .eq('user_id', user.id)
       .maybeSingle()
       .then(({ data }) => {
-        if (data) {
+        const cleanEmail = (user.email || '').toLowerCase().trim();
+        const isActualSilvio = cleanEmail === 'viochristian12@gmail.com' || cleanEmail === 'silvio@linknest.app';
+        if (data && (isActualSilvio || data.username !== 'silvio')) {
           setProfile(data);
           if (data.username) {
             setProfileUsername(data.username);
           }
         } else if (user.email) {
-          setProfileUsername(user.email.split('@')[0]);
+          setProfileUsername(user.email.split('@')[0].replace(/[^a-z0-9_-]/g, ''));
         }
       })
       .catch(() => {});

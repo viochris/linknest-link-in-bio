@@ -50,12 +50,9 @@ interface AdminDashboardProps {
 const createResilientProfile = (usr: AuthUser): Profile => {
   const cleanEmail = (usr.email || '').toLowerCase().trim();
   const isSilvio =
-    cleanEmail === 'viochristian860@gmail.com' ||
     cleanEmail === 'viochristian12@gmail.com' ||
     cleanEmail === 'silvio@linknest.app' ||
-    usr.id === 'user-silvio-001' ||
-    usr.id === SEED_PROFILE_SILVIO.id ||
-    usr.id === SEED_PROFILE_SILVIO.user_id;
+    (usr.id === 'user-silvio-001' && (cleanEmail === 'viochristian12@gmail.com' || cleanEmail === 'silvio@linknest.app'));
 
   if (isSilvio) {
     return {
@@ -91,7 +88,7 @@ const createResilientProfile = (usr: AuthUser): Profile => {
     display_name: usr.email?.split('@')[0] || 'LinkNest Creator',
     bio: 'Welcome to my LinkNest! Discover all my links below.',
     avatar_url: '/icon.svg',
-    theme: { ...SEED_PROFILE_SILVIO.theme },
+    theme: { ...SEED_PROFILE_DEMO.theme },
     view_count: 0,
     created_at: new Date().toISOString(),
   };
@@ -99,7 +96,7 @@ const createResilientProfile = (usr: AuthUser): Profile => {
 
 // Helper to get seed links depending on whether it is Silvio's authentic account or Demo
 const getSeedLinksForProfile = (prof: Profile): LinkItem[] => {
-  if (prof.id === SEED_PROFILE_SILVIO.id || prof.username?.toLowerCase() === 'silvio') {
+  if (prof.id === SEED_PROFILE_SILVIO.id && prof.username?.toLowerCase() === 'silvio') {
     return SEED_LINKS_SILVIO;
   }
   if (prof.id === SEED_PROFILE_DEMO.id || prof.username?.toLowerCase() === 'demo') {
@@ -127,7 +124,7 @@ const getSeedLinksForProfile = (prof: Profile): LinkItem[] => {
 };
 
 const getSeedSocialForProfile = (prof: Profile): SocialIconItem[] => {
-  if (prof.id === SEED_PROFILE_SILVIO.id || prof.username?.toLowerCase() === 'silvio') {
+  if (prof.id === SEED_PROFILE_SILVIO.id && prof.username?.toLowerCase() === 'silvio') {
     return SEED_SOCIAL_SILVIO;
   }
   if (prof.id === SEED_PROFILE_DEMO.id || prof.username?.toLowerCase() === 'demo') {
@@ -233,6 +230,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       // 1. Fetch owner profile with a 1500ms timeout
       let profileData: Profile | null = null;
+      const cleanEmail = (user.email || '').toLowerCase().trim();
+      const isActualSilvio = cleanEmail === 'viochristian12@gmail.com' || cleanEmail === 'silvio@linknest.app';
 
       try {
         const res = await withTimeout(
@@ -241,7 +240,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           { data: null, error: null }
         );
         if (res?.data) {
-          profileData = res.data;
+          if (!isActualSilvio && (res.data.username?.toLowerCase() === 'silvio' || res.data.id === SEED_PROFILE_SILVIO.id)) {
+            console.warn('[AdminDashboard] Ignored mismatched Silvio profile for user:', user.email);
+          } else {
+            profileData = res.data;
+          }
         }
       } catch (e) {
         console.warn('Remote profile query failed, using resilient fallback:', e);
@@ -250,14 +253,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       // 2. If not found by user_id, check username from email
       if (!profileData && user.email) {
         try {
-          const usernameGuess = user.email.split('@')[0].toLowerCase();
-          const fallbackRes = await withTimeout(
-            supabase.from('profiles').select('*').eq('username', usernameGuess).maybeSingle(),
-            1000,
-            { data: null, error: null }
-          );
-          if (fallbackRes?.data) {
-            profileData = fallbackRes.data;
+          const usernameGuess = user.email.split('@')[0].toLowerCase().replace(/[^a-z0-9_-]/g, '');
+          if (usernameGuess && (isActualSilvio || usernameGuess !== 'silvio')) {
+            const fallbackRes = await withTimeout(
+              supabase.from('profiles').select('*').eq('username', usernameGuess).maybeSingle(),
+              1000,
+              { data: null, error: null }
+            );
+            if (fallbackRes?.data && (isActualSilvio || fallbackRes.data.username?.toLowerCase() !== 'silvio')) {
+              profileData = fallbackRes.data;
+            }
           }
         } catch {}
       }
@@ -266,7 +271,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       if (!profileData) {
         try {
           const localRes = await localSimulator.from('profiles').select('*').eq('user_id', user.id).maybeSingle();
-          if (localRes?.data) {
+          if (localRes?.data && (isActualSilvio || localRes.data.username?.toLowerCase() !== 'silvio')) {
             profileData = localRes.data;
           }
         } catch {}
@@ -286,7 +291,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         if (savedCustom) {
           const parsed = JSON.parse(savedCustom);
           if (parsed && typeof parsed === 'object') {
-            profileData = { ...profileData, ...parsed };
+            if (isActualSilvio || parsed.username !== 'silvio') {
+              profileData = { ...profileData, ...parsed };
+            }
           }
         }
       } catch {}
@@ -313,7 +320,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       const initKey = 'linknest_links_initialized_' + profileData.id;
       const isAlreadyInit = localStorage.getItem(initKey) === 'true';
 
-      if (linksRes?.data && Array.isArray(linksRes.data) && linksRes.data.length > 0) {
+      // Check if user has saved / reordered links locally for this profile
+      const localSavedLinksStr = localStorage.getItem('linknest_saved_links_' + profileData.id);
+      let localSavedLinks: LinkItem[] | null = null;
+      if (localSavedLinksStr) {
+        try {
+          const parsed = JSON.parse(localSavedLinksStr);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            localSavedLinks = parsed;
+          }
+        } catch {}
+      }
+
+      if (localSavedLinks && localSavedLinks.length > 0) {
+        localStorage.setItem(initKey, 'true');
+        setLinks(enrichLinksWithLocalDescriptions(localSavedLinks));
+      } else if (linksRes?.data && Array.isArray(linksRes.data) && linksRes.data.length > 0) {
         localStorage.setItem(initKey, 'true');
         setLinks(enrichLinksWithLocalDescriptions(linksRes.data));
       } else {
@@ -481,9 +503,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 id="instant-open-dashboard-btn"
                 onClick={() => {
                   const fallback = createResilientProfile(user);
+                  const seedL = getSeedLinksForProfile(fallback);
+                  const seedS = getSeedSocialForProfile(fallback);
                   setProfile(fallback);
-                  setLinks(SEED_LINKS_SILVIO.map((l, i) => ({ ...l, id: `link_${fallback.id}_${i}`, profile_id: fallback.id })));
-                  setSocialIcons(SEED_SOCIAL_SILVIO.map((s, i) => ({ ...s, id: `soc_${fallback.id}_${i}`, profile_id: fallback.id })));
+                  setLinks(seedL.map((l, i) => ({ ...l, id: `link_${fallback.id}_${i}`, profile_id: fallback.id })));
+                  setSocialIcons(seedS.map((s, i) => ({ ...s, id: `soc_${fallback.id}_${i}`, profile_id: fallback.id })));
                   setLoading(false);
                 }}
                 className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-indigo-600/30 transition-all cursor-pointer active:scale-95"
