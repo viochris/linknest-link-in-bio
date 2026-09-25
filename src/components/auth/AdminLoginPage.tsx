@@ -87,6 +87,9 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onSuccess, onLog
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
+    if (searchParams.get('deleted') === 'true') {
+      setSuccessMsg('Your account and associated profile data have been permanently deleted.');
+    }
     if (searchParams.get('mode') === 'signup') {
       setIsLogin(false);
       setForgotPasswordOpen(false);

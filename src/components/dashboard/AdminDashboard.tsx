@@ -474,7 +474,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               className="pt-2 space-y-2.5"
             >
               <p className="text-xs text-amber-400/90 font-medium">
-                Koneksi database memerlukan waktu beberapa detik...
+                Connecting to database is taking a few moments...
               </p>
               <button
                 type="button"
@@ -823,6 +823,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             socialIcons={socialIcons}
             onProfileUpdated={(updated) => setProfile(updated)}
             onSocialUpdated={fetchDashboardData}
+            onAccountDeleted={handleLogout}
           />
         )}
 

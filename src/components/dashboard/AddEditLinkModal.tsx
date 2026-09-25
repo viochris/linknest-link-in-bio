@@ -7,7 +7,6 @@ import { detectPlatformFromUrl } from '../../lib/domainIcons';
 import { generateLinkDescription } from '../../lib/gemini';
 import { fetchLinkMetadata, LinkMetadataResult } from '../../lib/linkMetadata';
 import { validateUrlReachability, UrlReachabilityResult } from '../../lib/urlValidator';
-import { LinkPreviewCard } from './LinkPreviewCard';
 import { LinkScheduleDatePicker } from './LinkScheduleDatePicker';
 import { toDateTimeLocalString, fromDateTimeLocalToIso } from '../../lib/dateUtils';
 import {
@@ -218,30 +217,6 @@ export const AddEditLinkModal: React.FC<AddEditLinkModalProps> = ({
     let finalUrl = url.trim();
     if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://') && !finalUrl.startsWith('mailto:')) {
       finalUrl = `https://${finalUrl}`;
-    }
-
-    // Step: Reachability Validation Check before saving
-    if (!bypassBrokenWarning && !finalUrl.startsWith('mailto:')) {
-      const isAlreadyReachable = reachabilityResult && reachabilityResult.isReachable;
-      if (!isAlreadyReachable) {
-        setIsValidatingReachability(true);
-        setSaving(true);
-        try {
-          const result = await validateUrlReachability(finalUrl);
-          setReachabilityResult(result);
-
-          if (result.isBroken) {
-            setBrokenLinkWarning(result);
-            setSaving(false);
-            setIsValidatingReachability(false);
-            return; // Halt and show warning
-          }
-        } catch (validationErr) {
-          console.warn('Reachability check error:', validationErr);
-        } finally {
-          setIsValidatingReachability(false);
-        }
-      }
     }
 
     // Validate dates if scheduling is used
@@ -643,23 +618,7 @@ export const AddEditLinkModal: React.FC<AddEditLinkModalProps> = ({
             )}
           </div>
 
-          {/* Live Link Preview (OpenGraph Title, Description, Image) */}
-          <div className="pt-2">
-            <LinkPreviewCard
-              url={url}
-              title={title}
-              description={description}
-              icon={icon}
-              isFeatured={isFeatured}
-              metadata={ogMetadata}
-              isLoading={isFetchingOg}
-              onApplyOgMetadata={(ogTitle, ogDesc) => {
-                if (ogTitle) setTitle(ogTitle);
-                if (ogDesc) setDescription(ogDesc.slice(0, 100));
-              }}
-              onRefreshMetadata={() => triggerOgFetch(url, false)}
-            />
-          </div>
+
 
           {/* Broken Link Warning Banner */}
           {brokenLinkWarning && (

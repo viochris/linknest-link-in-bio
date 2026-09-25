@@ -441,6 +441,9 @@ class LocalSupabaseSimulator {
     updatePasswordDirectly: async (email: string, newPassword: string) => {
       return this.updatePasswordDirectly(email, newPassword);
     },
+    deleteAccount: async (userId: string, profileId?: string) => {
+      return this.deleteAccount(userId, profileId);
+    },
   };
 
   public async getSession(): Promise<{ data: { session: AuthSession | null } }> {
@@ -669,6 +672,53 @@ class LocalSupabaseSimulator {
     }
     saveDbState(this.db);
     return { data: { user }, error: null };
+  }
+
+  public async deleteAccount(userId: string, profileId?: string) {
+    this.db = getInitialDbState();
+    if (this.db.users) {
+      this.db.users = this.db.users.filter(u => u.id !== userId);
+    }
+
+    const userProfiles = (this.db.profiles || []).filter(
+      p => p.user_id === userId || (profileId && p.id === profileId)
+    );
+    const targetProfileIds = userProfiles.map(p => p.id);
+    if (profileId && !targetProfileIds.includes(profileId)) {
+      targetProfileIds.push(profileId);
+    }
+
+    if (this.db.profiles) {
+      this.db.profiles = this.db.profiles.filter(
+        p => p.user_id !== userId && !targetProfileIds.includes(p.id)
+      );
+    }
+    if (this.db.links) {
+      this.db.links = this.db.links.filter(l => !targetProfileIds.includes(l.profile_id));
+    }
+    if (this.db.social_icons) {
+      this.db.social_icons = this.db.social_icons.filter(
+        s => !targetProfileIds.includes(s.profile_id)
+      );
+    }
+    if (this.db.link_clicks) {
+      this.db.link_clicks = this.db.link_clicks.filter(
+        c => !targetProfileIds.includes(c.profile_id)
+      );
+    }
+
+    saveDbState(this.db);
+
+    for (const pid of targetProfileIds) {
+      try {
+        localStorage.removeItem('linknest_custom_profile_' + pid);
+        localStorage.removeItem('linknest_custom_social_' + pid);
+        localStorage.removeItem('linknest_links_initialized_' + pid);
+      } catch {}
+    }
+
+    this.setSession(null);
+    return { error: null };
   }
 
   // RPC: increment_view_count
@@ -1364,6 +1414,9 @@ export const supabase = {
         updatePasswordDirectly: async (email: string, newPassword: string) => {
           return await localSimulator.auth.updatePasswordDirectly(email, newPassword);
         },
+        deleteAccount: async (userId: string, profileId?: string) => {
+          return await deleteUserAccount(userId, profileId);
+        },
       };
     }
     return localSimulator.auth;
@@ -1664,3 +1717,56 @@ export const supabase = {
     return localSimulator.from(tableName);
   },
 } as any;
+
+/**
+ * Permanently deletes a user account, their profiles, links, social links, and analytics.
+ */
+export async function deleteUserAccount(userId: string, profileId?: string): Promise<{ error: any }> {
+  try {
+    // 1. If real Supabase client is connected, delete remote data
+    if (realClient && remoteTablesReady === true) {
+      if (profileId) {
+        try {
+          await realClient.from('link_clicks').delete().eq('profile_id', profileId);
+        } catch {}
+        try {
+          await realClient.from('links').delete().eq('profile_id', profileId);
+        } catch {}
+        try {
+          await realClient.from('social_icons').delete().eq('profile_id', profileId);
+        } catch {}
+        try {
+          await realClient.from('profiles').delete().eq('id', profileId);
+        } catch {}
+      }
+      try {
+        await realClient.auth.signOut();
+      } catch {}
+    }
+
+    // 2. Delete from local simulator
+    await localSimulator.deleteAccount(userId, profileId);
+
+    // 3. Clean specific local storage keys
+    if (profileId) {
+      try {
+        localStorage.removeItem('linknest_custom_profile_' + profileId);
+        localStorage.removeItem('linknest_custom_social_' + profileId);
+        localStorage.removeItem('linknest_links_initialized_' + profileId);
+      } catch {}
+    }
+    try {
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+    } catch {}
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('linknest:account_deleted'));
+    }
+
+    return { error: null };
+  } catch (err: any) {
+    console.error('Delete account failed:', err);
+    return { error: err };
+  }
+}
+

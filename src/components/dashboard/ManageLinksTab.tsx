@@ -348,26 +348,105 @@ export const ManageLinksTab: React.FC<ManageLinksTabProps> = ({
   };
 
   // Save new / edited link
-  const handleSaveLink = (savedLink: LinkItem) => {
-    if (!savedLink || !savedLink.id) {
-      console.error('[HandleSaveLink] Attempted to save invalid link:', savedLink);
-      showToast('Error: Link was not saved properly.');
-      return;
-    }
+  const handleSaveLink = async (savedLinkData: Partial<LinkItem>) => {
+    try {
+      const isEditing = Boolean(editingLink && editingLink.id);
+      const linkId = isEditing
+        ? editingLink!.id
+        : (typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `link_${profile.id}_${Date.now()}`);
 
-    setLinks((prev) => {
-      const exists = prev.some((l) => l.id === savedLink.id);
-      if (exists) {
-        return prev.map((l) => (l.id === savedLink.id ? savedLink : l));
-      } else {
-        return [...prev, savedLink];
+      const position = typeof savedLinkData.position === 'number'
+        ? savedLinkData.position
+        : links.length;
+
+      const finalLink: LinkItem = {
+        id: linkId,
+        profile_id: profile.id,
+        title: (savedLinkData.title || '').trim(),
+        url: (savedLinkData.url || '').trim(),
+        icon: savedLinkData.icon || 'globe',
+        category: savedLinkData.category || 'General',
+        description: savedLinkData.description ? savedLinkData.description.trim() : null,
+        is_active: savedLinkData.is_active !== undefined ? savedLinkData.is_active : true,
+        is_featured: savedLinkData.is_featured !== undefined ? savedLinkData.is_featured : false,
+        is_archived: savedLinkData.is_archived || false,
+        position,
+        click_count: isEditing ? (editingLink!.click_count || 0) : 0,
+        start_date: savedLinkData.start_date || null,
+        end_date: savedLinkData.end_date || null,
+        last_clicked_at: isEditing ? (editingLink!.last_clicked_at || null) : null,
+        created_at: isEditing ? (editingLink!.created_at || new Date().toISOString()) : new Date().toISOString(),
+      };
+
+      // Save description locally as backup
+      if (finalLink.description) {
+        saveLocalLinkDescription(finalLink.id, finalLink.description);
       }
-    });
 
-    onLinksUpdated();
-    showToast(editingLink ? 'Link updated.' : 'New link created.');
-    setModalOpen(false);
-    setEditingLink(null);
+      if (isEditing) {
+        // 1. Update in Supabase
+        const { error: sbErr } = await supabase
+          .from('links')
+          .update({
+            title: finalLink.title,
+            url: finalLink.url,
+            icon: finalLink.icon,
+            category: finalLink.category,
+            description: finalLink.description,
+            is_active: finalLink.is_active,
+            is_featured: finalLink.is_featured,
+            start_date: finalLink.start_date,
+            end_date: finalLink.end_date,
+            position: finalLink.position,
+          })
+          .eq('id', finalLink.id);
+
+        if (sbErr) {
+          console.warn('[handleSaveLink] Supabase update note:', sbErr);
+        }
+
+        // 2. Also update in local simulator
+        try {
+          await localSimulator.from('links').update(finalLink).eq('id', finalLink.id);
+        } catch {}
+
+        // 3. Update React state
+        setLinks((prev) => prev.map((l) => (l.id === finalLink.id ? finalLink : l)));
+        showToast('Link updated successfully.');
+      } else {
+        // 1. Insert in Supabase
+        const { error: sbErr } = await supabase
+          .from('links')
+          .insert(finalLink);
+
+        if (sbErr) {
+          console.warn('[handleSaveLink] Supabase insert note:', sbErr);
+        }
+
+        // 2. Also insert in local simulator
+        try {
+          await localSimulator.from('links').insert(finalLink);
+        } catch {}
+
+        // 3. Add to React state
+        setLinks((prev) => [...prev, finalLink]);
+        showToast('New link added successfully.');
+      }
+
+      // Mark initialized
+      try {
+        localStorage.setItem('linknest_links_initialized_' + profile.id, 'true');
+      } catch {}
+
+      setModalOpen(false);
+      setEditingLink(null);
+      onLinksUpdated();
+    } catch (err: any) {
+      console.error('[handleSaveLink] Error saving link:', err);
+      showToast(err.message || 'Failed to save link.');
+    }
   };
 
   // Drag and drop reordering

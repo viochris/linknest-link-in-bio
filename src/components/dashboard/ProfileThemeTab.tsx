@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Profile, LinkItem, SocialIconItem, ThemeConfig, ButtonStyle } from '../../types';
-import { supabase, resetTrialData } from '../../lib/supabase';
+import { supabase, resetTrialData, deleteUserAccount, localSimulator } from '../../lib/supabase';
 import { THEME_PRESETS, FONT_OPTIONS, SOCIAL_PLATFORMS, DEFAULT_AVATARS } from '../../lib/constants';
 import { RenderIcon } from '../../lib/icons';
 import { generateClientOgSvg, buildOgImageUrl } from '../../lib/og';
@@ -12,6 +12,7 @@ import {
   Plus,
   Trash2,
   AlertCircle,
+  AlertTriangle,
   Palette,
   User,
   Share2,
@@ -44,6 +45,7 @@ interface ProfileThemeTabProps {
   socialIcons: SocialIconItem[];
   onProfileUpdated: (updatedProfile: Profile) => void;
   onSocialUpdated: () => void;
+  onAccountDeleted?: () => void;
 }
 
 export const ProfileThemeTab: React.FC<ProfileThemeTabProps> = ({
@@ -52,6 +54,7 @@ export const ProfileThemeTab: React.FC<ProfileThemeTabProps> = ({
   socialIcons,
   onProfileUpdated,
   onSocialUpdated,
+  onAccountDeleted,
 }) => {
   // Form State
   const [displayName, setDisplayName] = useState(profile.display_name);
@@ -88,6 +91,12 @@ export const ProfileThemeTab: React.FC<ProfileThemeTabProps> = ({
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [showSaveSuccessModal, setShowSaveSuccessModal] = useState(false);
   const [copiedPublicUrl, setCopiedPublicUrl] = useState(false);
+
+  // Delete Account State
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Sync state if profile prop changes
   useEffect(() => {
@@ -195,7 +204,7 @@ export const ProfileThemeTab: React.FC<ProfileThemeTabProps> = ({
           .from('profiles')
           .select('id')
           .eq('username', cleanUsername)
-          .single();
+          .maybeSingle();
 
         if (existing && existing.id !== profile.id) {
           throw new Error(`Username "@${cleanUsername}" is already taken. Please choose another.`);
@@ -234,6 +243,11 @@ export const ProfileThemeTab: React.FC<ProfileThemeTabProps> = ({
         console.warn('Supabase remote profile update note:', profileErr);
       }
 
+      // Also sync to local simulator directly
+      try {
+        await localSimulator.from('profiles').update(updatedProfileData).eq('id', profile.id);
+      } catch {}
+
       // 2. Sync Social Icons in Supabase
       try {
         await supabase.from('social_icons').delete().eq('profile_id', profile.id);
@@ -245,6 +259,10 @@ export const ProfileThemeTab: React.FC<ProfileThemeTabProps> = ({
             position: idx,
           }));
           await supabase.from('social_icons').insert(formatted);
+          try {
+            await localSimulator.from('social_icons').delete().eq('profile_id', profile.id);
+            await localSimulator.from('social_icons').insert(formatted);
+          } catch {}
         }
       } catch (socialErr) {
         console.warn('Social icons sync note:', socialErr);
@@ -271,6 +289,40 @@ export const ProfileThemeTab: React.FC<ProfileThemeTabProps> = ({
       setError(err.message || 'Failed to save profile changes.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Permanently delete user account
+  const handleDeleteAccount = async () => {
+    const targetText = deleteConfirmText.trim();
+    const isConfirmed =
+      targetText.toLowerCase() === username.toLowerCase() ||
+      targetText.toUpperCase() === 'DELETE' ||
+      targetText.toLowerCase() === (profile.display_name || '').toLowerCase();
+
+    if (!isConfirmed) {
+      setDeleteError(`Please type "${username}" or "DELETE" to confirm.`);
+      return;
+    }
+
+    setDeleteError(null);
+    setIsDeletingAccount(true);
+    try {
+      const { error: delErr } = await deleteUserAccount(profile.user_id || profile.id, profile.id);
+      if (delErr) {
+        throw delErr;
+      }
+      setShowDeleteModal(false);
+      if (onAccountDeleted) {
+        onAccountDeleted();
+      } else {
+        window.location.href = '/admin/login?deleted=true';
+      }
+    } catch (err: any) {
+      console.error('Account deletion error:', err);
+      setDeleteError(err.message || 'Failed to delete account. Please try again.');
+    } finally {
+      setIsDeletingAccount(false);
     }
   };
 
@@ -949,6 +1001,128 @@ export const ProfileThemeTab: React.FC<ProfileThemeTabProps> = ({
             </button>
           </div>
         </form>
+
+        {/* Danger Zone: Delete Account */}
+        <div className="mt-8 pt-6 border-t border-rose-500/20">
+          <div className="p-5 rounded-2xl bg-rose-950/20 border border-rose-500/30 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                  <h3 className="text-sm font-bold text-white">Danger Zone: Delete Account</h3>
+                </div>
+                <p className="text-xs text-rose-200/80 leading-relaxed max-w-xl">
+                  Permanently delete your LinkNest account, release public username (@{username}), and wipe all links, click analytics, and profile settings.
+                </p>
+              </div>
+              <button
+                type="button"
+                id="open-delete-account-modal-btn"
+                onClick={() => {
+                  setDeleteConfirmText('');
+                  setDeleteError(null);
+                  setShowDeleteModal(true);
+                }}
+                className="px-4 py-2.5 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap shadow-sm min-h-[40px]"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Account</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Delete Account Confirmation Modal */}
+        {showDeleteModal && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150"
+            onClick={() => !isDeletingAccount && setShowDeleteModal(false)}
+          >
+            <div
+              className="bg-slate-900 border border-rose-500/30 text-slate-100 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 relative text-left"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0">
+                  <AlertTriangle className="w-6 h-6" />
+                </div>
+                <div className="space-y-1 min-w-0 flex-1">
+                  <h3 className="text-base font-bold text-white">
+                    Delete Account Permanently?
+                  </h3>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    This action is irreversible. All of your created links, custom theme, and historical click analytics will be completely erased.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-2 text-xs text-slate-300">
+                <div className="font-semibold text-rose-300 flex items-center gap-1.5">
+                  <span>The following data will be erased:</span>
+                </div>
+                <ul className="space-y-1 text-slate-400 pl-4 list-disc text-[11px]">
+                  <li>Public username <span className="font-mono text-white">@{username}</span> will be freed up</li>
+                  <li>All <span className="text-white font-medium">{links.length} links</span> and click events</li>
+                  <li>Custom theme presets, avatar, and social icons</li>
+                  <li>Your login credentials and active sessions</li>
+                </ul>
+              </div>
+
+              {deleteError && (
+                <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{deleteError}</span>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label className="block text-xs font-medium text-slate-300">
+                  Type <span className="font-mono font-bold text-rose-400">{username}</span> or <span className="font-mono font-bold text-rose-400">DELETE</span> to confirm:
+                </label>
+                <input
+                  id="delete-account-confirm-input"
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder={username}
+                  disabled={isDeletingAccount}
+                  className="w-full bg-slate-950 border border-slate-700 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-slate-600 outline-none font-mono"
+                />
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  id="cancel-delete-account-btn"
+                  onClick={() => setShowDeleteModal(false)}
+                  disabled={isDeletingAccount}
+                  className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors cursor-pointer min-h-[42px]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  id="confirm-delete-account-btn"
+                  onClick={handleDeleteAccount}
+                  disabled={isDeletingAccount || !deleteConfirmText.trim()}
+                  className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 shadow-lg shadow-rose-600/30 transition-all cursor-pointer min-h-[42px]"
+                >
+                  {isDeletingAccount ? (
+                    <>
+                      <RotateCcw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Deleting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete Forever</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Save Success Confirmation Popup Modal */}
       {showSaveSuccessModal && (
