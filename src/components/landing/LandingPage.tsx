@@ -32,6 +32,8 @@ import {
   Compass,
   HelpCircle,
   Copy,
+  Menu,
+  X,
 } from 'lucide-react';
 import { LinkNestLogo } from '../common/LinkNestLogo';
 
@@ -75,6 +77,7 @@ export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const [mockCopied, setMockCopied] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleCopyMockUrl = () => {
     const origin = typeof window !== 'undefined' ? window.location.origin : 'https://linknest-link-in-bio.vercel.app';
@@ -93,15 +96,15 @@ export const LandingPage: React.FC = () => {
       <header className="w-full border-b border-slate-800/80 bg-slate-950/85 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-8 py-3.5">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2.5 group">
+          <Link to="/" className="flex items-center gap-2.5 group shrink-0">
             <LinkNestLogo size={34} />
             <span className="font-bold text-white text-base tracking-tight group-hover:text-indigo-200 transition-colors">
               LinkNest
             </span>
           </Link>
 
-          {/* Desktop Navigation Links */}
-          <nav className="hidden md:flex items-center gap-6 text-xs font-semibold text-slate-400">
+          {/* Desktop Navigation Links - comfortably spaced, only on xl screens */}
+          <nav className="hidden xl:flex items-center gap-8 text-xs font-semibold text-slate-400">
             <a href="#features" className="hover:text-white transition-colors">Features</a>
             <a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a>
             <a href="#live-preview" className="hover:text-white transition-colors">Live Demo</a>
@@ -109,8 +112,8 @@ export const LandingPage: React.FC = () => {
             <a href="#faq" className="hover:text-white transition-colors">FAQ</a>
           </nav>
 
-          {/* Navigation CTAs */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          {/* Navigation CTAs & Responsive Menu Button */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <Link
               to="/admin/login"
               id="landing-login-btn"
@@ -121,13 +124,93 @@ export const LandingPage: React.FC = () => {
             <Link
               to="/admin/login?mode=signup"
               id="landing-signup-btn"
-              className="px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded-xl transition-all shadow-md shadow-indigo-600/25 flex items-center gap-1.5 cursor-pointer active:scale-95"
+              className="hidden sm:flex px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded-xl transition-all shadow-md shadow-indigo-600/25 items-center gap-1.5 cursor-pointer active:scale-95"
             >
               <span>Create Your Page</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
+
+            {/* Dropdown Hamburger Toggle Button for Screens Below xl */}
+            <button
+              type="button"
+              id="nav-dropdown-toggle-btn"
+              onClick={() => setMobileMenuOpen(prev => !prev)}
+              aria-label="Toggle navigation menu"
+              className="xl:hidden p-2 rounded-xl text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
+            >
+              {mobileMenuOpen ? <X className="w-4 h-4 text-indigo-400" /> : <Menu className="w-4 h-4" />}
+              <span className="hidden md:inline">Menu</span>
+            </button>
           </div>
         </div>
+
+        {/* Collapsible Dropdown Navigation Menu */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+              className="xl:hidden overflow-hidden border-t border-slate-800/80 mt-3 pt-3 pb-2 max-w-6xl mx-auto"
+            >
+              <div className="flex flex-col gap-1 text-sm font-medium">
+                <a
+                  href="#features"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-900/80 transition-colors flex items-center justify-between"
+                >
+                  <span>Features</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-slate-600" />
+                </a>
+                <a
+                  href="#how-it-works"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-900/80 transition-colors flex items-center justify-between"
+                >
+                  <span>How It Works</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-slate-600" />
+                </a>
+                <a
+                  href="#live-preview"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-900/80 transition-colors flex items-center justify-between"
+                >
+                  <span>Live Demo</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-slate-600" />
+                </a>
+                <a
+                  href="#comparison"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-900/80 transition-colors flex items-center justify-between"
+                >
+                  <span>Why LinkNest</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-slate-600" />
+                </a>
+                <a
+                  href="#faq"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-900/80 transition-colors flex items-center justify-between"
+                >
+                  <span>FAQ</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-slate-600" />
+                </a>
+
+                {/* Mobile-only CTA */}
+                <div className="pt-2 border-t border-slate-800/60 flex flex-col gap-2 sm:hidden">
+                  <Link
+                    to="/admin/login?mode=signup"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl shadow-md flex items-center justify-center gap-2"
+                  >
+                    <span>Create Your Page</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </header>
 
       {/* Main Content Area */}

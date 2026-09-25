@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { supabase } from '../../lib/supabase';
+import { formatAuthError } from './AdminLoginPage';
 import {
   Lock,
   Mail,
@@ -10,7 +11,9 @@ import {
   CheckCircle2,
   Sparkles,
   X,
-  KeyRound
+  KeyRound,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 interface AdminAuthModalProps {
@@ -27,12 +30,16 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
+  const [resetSubmitted, setResetSubmitted] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
 
   if (!isOpen) return null;
 
@@ -51,7 +58,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
         });
 
         if (authErr) {
-          setError(authErr.message || 'Login failed. Please check your credentials.');
+          setError(formatAuthError(authErr.message));
           setLoading(false);
           return;
         }
@@ -93,19 +100,19 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
         });
 
         if (signUpErr) {
-          setError(signUpErr.message || 'Signup failed.');
+          setError(formatAuthError(signUpErr.message));
           setLoading(false);
           return;
         }
 
-        setSuccessMsg('Account created successfully! Logging you in...');
+        setSuccessMsg('Account created successfully! Redirecting...');
         setTimeout(() => {
           onSuccess();
           onClose();
         }, 800);
       }
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+      setError(formatAuthError(err.message));
     } finally {
       setLoading(false);
     }
@@ -135,17 +142,55 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
-      setError('Please enter your email address first.');
+      setError('Please enter your email.');
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      await supabase.auth.resetPasswordForEmail(email);
-      setSuccessMsg('Password reset email sent! Check your inbox.');
-      setTimeout(() => setForgotPasswordOpen(false), 2500);
+      const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email);
+      if (resetErr) {
+        setError(formatAuthError(resetErr.message));
+      } else {
+        setResetSubmitted(true);
+        setError(null);
+      }
     } catch (err: any) {
-      setError(err.message || 'Failed to send password reset email.');
+      setError(formatAuthError(err.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSetNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword || newPassword.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const { error: updateErr } = await (supabase.auth as any).updatePasswordDirectly(email, newPassword);
+      if (updateErr) {
+        setError(formatAuthError(updateErr.message));
+        setLoading(false);
+        return;
+      }
+      const { error: loginErr } = await supabase.auth.signInWithPassword({
+        email,
+        password: newPassword,
+      });
+      if (loginErr) {
+        setSuccessMsg('Password updated! Please sign in.');
+        setForgotPasswordOpen(false);
+        setResetSubmitted(false);
+      } else {
+        onSuccess();
+        onClose();
+      }
+    } catch (err: any) {
+      setError(formatAuthError(err.message));
     } finally {
       setLoading(false);
     }
@@ -313,16 +358,26 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
               )}
             </div>
             <div className="relative">
-              <KeyRound className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+              <KeyRound className="w-4 h-4 text-slate-500 absolute left-3 top-3 pointer-events-none" />
               <input
                 id="auth-password"
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2.5 pl-9 pr-3 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 transition-colors"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2.5 pl-9 pr-10 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 transition-colors font-mono"
               />
+              <button
+                type="button"
+                id="auth-toggle-password-visibility-btn"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute right-3 top-2.5 p-0.5 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+                title={showPassword ? 'Hide password' : 'Show password'}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
           </div>
 
@@ -365,37 +420,99 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
 
         {/* Forgot password modal / drawer */}
         {forgotPasswordOpen && (
-          <div className="absolute inset-0 bg-slate-900/95 backdrop-blur-md p-6 flex flex-col justify-center text-center z-20">
-            <h3 className="text-lg font-bold text-white mb-2">Reset Password</h3>
-            <p className="text-xs text-slate-400 mb-4">
-              Enter your email and Supabase Auth will send a recovery link.
-            </p>
-            <form onSubmit={handleForgotPassword} className="space-y-3">
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="your-email@example.com"
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-slate-100 outline-none"
-              />
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setForgotPasswordOpen(false)}
-                  className="flex-1 py-2 bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl"
-                >
-                  Send Link
-                </button>
+          <div className="absolute inset-0 bg-slate-900/98 backdrop-blur-md p-6 flex flex-col justify-center text-center z-20">
+            {resetSubmitted ? (
+              <div>
+                <h3 className="text-lg font-bold text-white mb-1">Set New Password</h3>
+                <p className="text-xs text-slate-400 mb-4">
+                  Enter new password for <span className="text-indigo-300 font-semibold">{email}</span>
+                </p>
+                {error && (
+                  <div className="mb-3 p-2.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-300 text-xs">
+                    {error}
+                  </div>
+                )}
+                <form onSubmit={handleSetNewPassword} className="space-y-3 text-left">
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      required
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="New password (min. 6 chars)"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 pr-10 text-sm text-slate-100 outline-none focus:border-indigo-500 font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword((prev) => !prev)}
+                      className="absolute right-3 top-2.5 p-0.5 text-slate-500 hover:text-slate-300"
+                    >
+                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setResetSubmitted(false);
+                        setError(null);
+                      }}
+                      className="flex-1 py-2.5 bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold rounded-xl"
+                    >
+                      {loading ? 'Saving...' : 'Save & Sign In'}
+                    </button>
+                  </div>
+                </form>
               </div>
-            </form>
+            ) : (
+              <div>
+                <h3 className="text-lg font-bold text-white mb-1">Reset Password</h3>
+                <p className="text-xs text-slate-400 mb-4">
+                  Enter your account email to reset your password.
+                </p>
+                {error && (
+                  <div className="mb-3 p-2.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-300 text-xs">
+                    {error}
+                  </div>
+                )}
+                <form onSubmit={handleForgotPassword} className="space-y-3">
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="your-email@example.com"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-slate-100 outline-none focus:border-indigo-500"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForgotPasswordOpen(false);
+                        setError(null);
+                      }}
+                      className="flex-1 py-2 bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold rounded-xl"
+                    >
+                      {loading ? 'Checking...' : 'Continue'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
           </div>
         )}
       </motion.div>

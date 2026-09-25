@@ -11,6 +11,7 @@ import { PasswordGate } from './PasswordGate';
 import { getProfileSeoMetadata, generateClientOgSvg, buildOgImageUrl } from '../../lib/og';
 import QRCode from 'qrcode';
 import { QrCodeModal } from '../dashboard/QrCodeModal';
+import { LinkNestLogo } from '../common/LinkNestLogo';
 import {
   Share2,
   Lock,
@@ -427,8 +428,24 @@ export const PublicProfilePage: React.FC<PublicProfilePageProps> = ({
         <meta name="twitter:image" content={seo.ogImageUrl} />
         <meta name="twitter:image:alt" content={seo.title} />
       </Helmet>
-      {/* Top Floating Bar: Share & Admin/Owner link */}
-      <header className="w-full max-w-xl flex items-center justify-end pt-2 pb-6 px-2 z-20 gap-2">
+      {/* Top Floating Bar: LinkNest Brand Logo on Left & Actions on Right */}
+      <header className="w-full max-w-xl flex items-center justify-between pt-2 pb-6 px-2 z-20 gap-2">
+        {/* Top Left: LinkNest Brand Logo */}
+        <a
+          href="/"
+          title="Powered by LinkNest"
+          className={`flex items-center gap-2 px-2.5 py-1.5 rounded-full transition-all duration-200 group active:scale-95 shrink-0 ${
+            isLightBackground
+              ? 'bg-white/80 hover:bg-white text-slate-800 border border-slate-200/90 shadow-sm'
+              : 'bg-slate-900/60 hover:bg-slate-800/80 text-white border border-slate-800/80 backdrop-blur-md shadow-sm'
+          }`}
+        >
+          <LinkNestLogo size={22} />
+          <span className="font-bold text-xs tracking-tight text-white group-hover:text-indigo-400 transition-colors">
+            LinkNest
+          </span>
+        </a>
+
         <div className="flex items-center gap-2 shrink-0">
           {/* Re-lock button if profile is password protected */}
           {isPasswordGated && (

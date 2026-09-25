@@ -39,16 +39,14 @@ export async function fetchUserProfileData(username: string): Promise<Profile | 
       return data as Profile;
     }
 
-    // Fallback for default @silvio profile or public @demo profile
-    if (cleanUsername === 'silvio' || cleanUsername === 'demo') {
-      const res = await localSimulator
-        .from('profiles')
-        .select('*')
-        .eq('username', cleanUsername)
-        .maybeSingle();
-      if (res.data) {
-        return res.data as Profile;
-      }
+    // Fallback to local simulator for registered users or seed profiles
+    const res = await localSimulator
+      .from('profiles')
+      .select('*')
+      .eq('username', cleanUsername)
+      .maybeSingle();
+    if (res.data) {
+      return res.data as Profile;
     }
 
     return null;

@@ -15,12 +15,53 @@ import {
   ShieldCheck,
   Send,
   X,
-  RotateCcw
+  RotateCcw,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 interface AdminLoginPageProps {
   onSuccess?: () => void;
   onLoginSuccess?: (user: { id: string; email?: string }) => void;
+}
+
+export function formatAuthError(rawMessage?: string | null): string {
+  if (!rawMessage) return 'Sign in failed.';
+  const lower = rawMessage.toLowerCase();
+  if (lower.includes('failed to fetch') || lower.includes('networkerror') || lower.includes('network request failed')) {
+    return 'Connection error. Please try again.';
+  }
+  if (lower.includes('invalid login credentials') || lower.includes('invalid credentials')) {
+    return 'Invalid email or password.';
+  }
+  if (
+    lower.includes('user not found') ||
+    lower.includes('akun tidak ditemukan') ||
+    lower.includes('no account found') ||
+    lower.includes('account not found')
+  ) {
+    return 'Account not found.';
+  }
+  if (
+    lower.includes('kata sandi tidak sesuai') ||
+    lower.includes('wrong password') ||
+    lower.includes('invalid password') ||
+    lower.includes('incorrect password')
+  ) {
+    return 'Incorrect password.';
+  }
+  if (
+    lower.includes('already registered') ||
+    lower.includes('already taken') ||
+    lower.includes('sudah terdaftar') ||
+    lower.includes('already in use')
+  ) {
+    return 'Email or username already registered.';
+  }
+  if (lower.includes('email not confirmed')) {
+    return 'Email is not confirmed.';
+  }
+  return rawMessage;
 }
 
 export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onSuccess, onLoginSuccess }) => {
@@ -31,6 +72,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onSuccess, onLog
   const [isLogin, setIsLogin] = useState(!isSignupMode && !isForgotMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
@@ -39,6 +81,10 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onSuccess, onLog
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(isForgotMode);
   const [forgotEmail, setForgotEmail] = useState('');
   const [resetSubmitted, setResetSubmitted] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
     if (searchParams.get('mode') === 'signup') {
@@ -80,13 +126,13 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onSuccess, onLog
         });
 
         if (authErr) {
-          setError(authErr.message || 'Login failed. Please check your credentials.');
+          setError(formatAuthError(authErr.message));
           setLoading(false);
           return;
         }
 
         if (!authData?.session) {
-          setError('Please check your email to confirm your account before logging in.');
+          setError('Please confirm your email before signing in.');
           setLoading(false);
           return;
         }
@@ -127,27 +173,26 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onSuccess, onLog
         });
 
         if (signUpErr) {
-          setError(signUpErr.message || 'Signup failed.');
+          setError(formatAuthError(signUpErr.message));
           setLoading(false);
           return;
         }
 
         // Check whether a valid session was returned
-        // If email confirmation is required by Supabase Auth, signUpData.session will be null
         if (!signUpData?.session) {
-          setSuccessMsg('Account created! Please check your email to confirm your account before logging in.');
+          setSuccessMsg('Account created! Please sign in with your credentials.');
           setIsLogin(true);
           setLoading(false);
           return;
         }
 
-        setSuccessMsg('Account created successfully! Redirecting to dashboard...');
+        setSuccessMsg('Account created! Redirecting to dashboard...');
         setTimeout(() => {
           handleSuccess(signUpData.session.user);
         }, 800);
       }
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+      setError(formatAuthError(err.message));
     } finally {
       setLoading(false);
     }
@@ -179,7 +224,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onSuccess, onLog
     e.preventDefault();
     const targetEmail = (forgotEmail || email).trim().toLowerCase();
     if (!targetEmail) {
-      setError('Please enter your email address to receive password reset instructions.');
+      setError('Please enter your email.');
       return;
     }
     setError(null);
@@ -187,19 +232,61 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onSuccess, onLog
     setLoading(true);
 
     try {
-      const redirectUrl = typeof window !== 'undefined' ? `${window.location.origin}/admin/login` : undefined;
-      const { error: resetErr } = await supabase.auth.resetPasswordForEmail(targetEmail, {
-        redirectTo: redirectUrl,
-      });
+      const { error: resetErr } = await supabase.auth.resetPasswordForEmail(targetEmail);
 
       if (resetErr) {
-        setError(resetErr.message || 'Failed to send password reset email.');
+        setError(formatAuthError(resetErr.message));
       } else {
         setResetSubmitted(true);
-        setSuccessMsg(`Password recovery instructions sent to ${targetEmail}. Please check your inbox (and spam folder).`);
+        setError(null);
       }
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred while sending the reset email.');
+      setError(formatAuthError(err.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSetNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword || newPassword.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const targetEmail = (forgotEmail || email).trim().toLowerCase();
+      const { error: updateErr } = await (supabase.auth as any).updatePasswordDirectly(targetEmail, newPassword);
+      if (updateErr) {
+        setError(formatAuthError(updateErr.message));
+        setLoading(false);
+        return;
+      }
+
+      // Automatically sign in with the new password
+      const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
+        email: targetEmail,
+        password: newPassword,
+      });
+
+      if (authErr || !authData?.session) {
+        setSuccessMsg('Password updated! Please sign in.');
+        setForgotPasswordOpen(false);
+        setIsLogin(true);
+        setPassword(newPassword);
+      } else {
+        setSuccessMsg('Password updated! Redirecting...');
+        setTimeout(() => {
+          handleSuccess(authData.session.user);
+        }, 600);
+      }
+    } catch (err: any) {
+      setError(formatAuthError(err.message));
     } finally {
       setLoading(false);
     }
@@ -382,16 +469,26 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onSuccess, onLog
               )}
             </div>
             <div className="relative">
-              <KeyRound className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+              <KeyRound className="w-4 h-4 text-slate-500 absolute left-3 top-3 pointer-events-none" />
               <input
                 id="login-password"
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2.5 pl-9 pr-3 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 transition-colors"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2.5 pl-9 pr-10 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 transition-colors font-mono"
               />
+              <button
+                type="button"
+                id="toggle-password-visibility-btn"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute right-3 top-2.5 p-0.5 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+                title={showPassword ? 'Hide password' : 'Show password'}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
           </div>
 
@@ -495,65 +592,120 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onSuccess, onLog
                   <X className="w-4 h-4" />
                 </button>
 
-                {/* Header Back Navigation & Badge */}
+                {/* Header Badge */}
                 <div className="flex items-center justify-between mb-4 pr-8">
                   <span className="text-[11px] font-mono text-indigo-400 bg-indigo-500/10 px-2.5 py-0.5 rounded-full border border-indigo-500/20">
-                    Supabase Auth Recovery
+                    Password Recovery
                   </span>
                 </div>
 
-                {/* Step 2: Confirmation Step */}
+                {/* Step 2: Set New Password Directly */}
                 {resetSubmitted ? (
-                  <div id="forgot-password-confirmation-step" className="space-y-4">
-                    <div className="text-center pt-2 pb-1">
-                      <div className="w-14 h-14 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mx-auto mb-3 shadow-inner">
-                        <CheckCircle2 className="w-7 h-7 text-emerald-400" />
+                  <div id="forgot-password-set-new-step" className="space-y-4">
+                    <div className="text-center mb-4">
+                      <div className="w-12 h-12 rounded-2xl bg-indigo-600/15 border border-indigo-500/25 flex items-center justify-center mx-auto mb-2.5 shadow-inner">
+                        <KeyRound className="w-5 h-5 text-indigo-400" />
                       </div>
                       <h2 id="forgot-password-title" className="text-xl font-bold text-white tracking-tight">
-                        Recovery Link Sent!
+                        Set New Password
                       </h2>
-                      <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                        We've dispatched password reset instructions from Supabase to:
+                      <p className="text-xs text-slate-400 mt-1">
+                        Choose a new password for <span className="text-slate-200 font-semibold">{forgotEmail || email}</span>
                       </p>
-                      <div className="mt-2 py-2 px-3 bg-slate-950/80 border border-slate-800 rounded-xl inline-block text-xs font-mono text-emerald-300 font-semibold max-w-full truncate">
-                        {forgotEmail || email}
+                    </div>
+
+                    {error && (
+                      <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-300 text-xs flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+                        <span className="font-medium text-rose-200">{error}</span>
                       </div>
-                    </div>
+                    )}
 
-                    <div className="p-3.5 bg-slate-950/50 border border-slate-800/80 rounded-2xl text-[11px] text-slate-400 space-y-1.5 leading-relaxed">
-                      <p className="font-semibold text-slate-300">Next Steps:</p>
-                      <ul className="list-disc pl-4 space-y-1">
-                        <li>Open your email inbox and find the message from Supabase.</li>
-                        <li>Click the secure verification link inside to choose your new password.</li>
-                        <li>Check your spam or junk folder if you don't see it within 2 minutes.</li>
-                      </ul>
-                    </div>
+                    <form onSubmit={handleSetNewPassword} className="space-y-3.5">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                          New Password
+                        </label>
+                        <div className="relative">
+                          <KeyRound className="w-4 h-4 text-slate-500 absolute left-3 top-3 pointer-events-none" />
+                          <input
+                            id="reset-new-password"
+                            type={showNewPassword ? 'text' : 'password'}
+                            required
+                            placeholder="At least 6 characters"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2.5 pl-9 pr-10 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 transition-colors font-mono"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowNewPassword((prev) => !prev)}
+                            className="absolute right-3 top-2.5 p-0.5 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+                            title={showNewPassword ? 'Hide password' : 'Show password'}
+                            aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                          >
+                            {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
 
-                    <div className="pt-2 flex flex-col sm:flex-row items-center gap-2">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                          Confirm New Password
+                        </label>
+                        <div className="relative">
+                          <KeyRound className="w-4 h-4 text-slate-500 absolute left-3 top-3 pointer-events-none" />
+                          <input
+                            id="reset-confirm-password"
+                            type={showConfirmPassword ? 'text' : 'password'}
+                            required
+                            placeholder="Repeat new password"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2.5 pl-9 pr-10 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 transition-colors font-mono"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword((prev) => !prev)}
+                            className="absolute right-3 top-2.5 p-0.5 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+                            title={showConfirmPassword ? 'Hide password' : 'Show password'}
+                            aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                          >
+                            {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+
                       <button
-                        id="forgot-password-done-btn"
-                        type="button"
-                        onClick={() => {
-                          setForgotPasswordOpen(false);
-                          setError(null);
-                          setResetSubmitted(false);
-                        }}
-                        className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition-all shadow-md shadow-indigo-600/20 text-center"
+                        id="save-new-password-btn"
+                        type="submit"
+                        disabled={loading}
+                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold rounded-xl text-sm transition-all shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 mt-2"
                       >
-                        Return to Sign In
+                        {loading ? (
+                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        ) : (
+                          <>
+                            <span>Save Password & Sign In</span>
+                            <ArrowRight className="w-4 h-4" />
+                          </>
+                        )}
                       </button>
-                      <button
-                        id="forgot-password-resend-btn"
-                        type="button"
-                        onClick={() => {
-                          setResetSubmitted(false);
-                        }}
-                        className="w-full sm:w-auto py-2.5 px-3 border border-slate-800 hover:border-slate-700 bg-slate-800/40 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-medium rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        <span>Send Again</span>
-                      </button>
-                    </div>
+
+                      <div className="text-center pt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setResetSubmitted(false);
+                            setError(null);
+                          }}
+                          className="text-xs text-slate-400 hover:text-slate-200 transition-colors inline-flex items-center gap-1.5"
+                        >
+                          <ArrowLeft className="w-3.5 h-3.5" />
+                          <span>Use a different email</span>
+                        </button>
+                      </div>
+                    </form>
                   </div>
                 ) : (
                   /* Step 1: Input Email Form */
@@ -563,10 +715,10 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onSuccess, onLog
                         <KeyRound className="w-5 h-5 text-indigo-400" />
                       </div>
                       <h2 id="forgot-password-title" className="text-xl font-bold text-white tracking-tight">
-                        Reset Your Password
+                        Reset Password
                       </h2>
                       <p className="text-xs text-slate-400 mt-1.5 leading-relaxed max-w-xs mx-auto">
-                        Enter the email associated with your LinkNest account to receive a secure password recovery link.
+                        Enter your account email to reset your password.
                       </p>
                     </div>
 
@@ -583,7 +735,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onSuccess, onLog
                     <form onSubmit={handleForgotPassword} className="space-y-4">
                       <div>
                         <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                          Account Email Address
+                          Email Address
                         </label>
                         <div className="relative">
                           <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
@@ -610,7 +762,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onSuccess, onLog
                         ) : (
                           <>
                             <Send className="w-4 h-4" />
-                            <span>Send Password Reset Link</span>
+                            <span>Continue</span>
                           </>
                         )}
                       </button>

@@ -438,6 +438,9 @@ class LocalSupabaseSimulator {
     resetPasswordForEmail: async (email: string, options?: { redirectTo?: string }) => {
       return this.resetPasswordForEmail(email, options);
     },
+    updatePasswordDirectly: async (email: string, newPassword: string) => {
+      return this.updatePasswordDirectly(email, newPassword);
+    },
   };
 
   public async getSession(): Promise<{ data: { session: AuthSession | null } }> {
@@ -454,62 +457,49 @@ class LocalSupabaseSimulator {
     let user = this.db.users.find(u => u.email.toLowerCase() === cleanEmail);
 
     if (!user) {
-      // Auto-register so user is never blocked by login difficulties
-      const newUserId = 'usr_' + Math.random().toString(36).substring(2, 10);
-      user = {
-        id: newUserId,
-        email: cleanEmail,
-        passwordHash: password || 'demo123',
+      // Must NOT auto-register on login. Return clear error if account is not found.
+      return {
+        data: { session: null, user: null },
+        error: { message: 'No account found with this email address. Please check your spelling or sign up.' },
       };
-      this.db.users.push(user);
-      saveDbState(this.db);
-    } else if (password) {
-      user.passwordHash = password;
-      saveDbState(this.db);
     }
 
-    // Ensure user has a profile and seed links/icons in local simulator
-    const hasProfile = this.db.profiles.some(p => p.user_id === user!.id);
-    if (!hasProfile) {
-      const isSilvio = cleanEmail.includes('silvio') || cleanEmail.includes('viochristian');
-      const isDemo = cleanEmail.includes('demo');
+    if (password && user.passwordHash && user.passwordHash !== password) {
+      return {
+        data: { session: null, user: null },
+        error: { message: 'Incorrect password. Please try again.' },
+      };
+    }
 
-      let baseProfile: Profile;
-      let seedLinks: LinkItem[];
-      let seedSocial: SocialIconItem[];
+    // Ensure user has their corresponding profile
+    let profile = this.db.profiles.find(p => p.user_id === user!.id);
+    if (!profile) {
+      const isSilvio =
+        cleanEmail === 'viochristian860@gmail.com' ||
+        cleanEmail === 'viochristian12@gmail.com' ||
+        cleanEmail === 'silvio@linknest.app';
+      const isDemo = cleanEmail === 'demo@linknest.app' || cleanEmail === 'demo@example.com';
 
       if (isSilvio) {
-        baseProfile = { ...SEED_PROFILE_SILVIO, user_id: user.id };
-        seedLinks = SEED_LINKS_SILVIO;
-        seedSocial = SEED_SOCIAL_SILVIO;
+        profile = { ...SEED_PROFILE_SILVIO, user_id: user.id };
+        this.db.profiles.push(profile);
       } else if (isDemo) {
-        baseProfile = { ...SEED_PROFILE_DEMO, user_id: user.id };
-        seedLinks = SEED_LINKS_DEMO;
-        seedSocial = SEED_SOCIAL_DEMO;
+        profile = { ...SEED_PROFILE_DEMO, user_id: user.id };
+        this.db.profiles.push(profile);
       } else {
-        baseProfile = {
+        const username = cleanEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'creator';
+        profile = {
           id: 'prof_' + Math.random().toString(36).substring(2, 10),
           user_id: user.id,
-          username: cleanEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'creator',
+          username,
           display_name: cleanEmail.split('@')[0] || 'LinkNest Creator',
           bio: 'Welcome to my LinkNest! Discover all my links below.',
-          avatar_url: '/avatar-silvio.png',
+          avatar_url: '/icon.svg',
           theme: { ...SEED_PROFILE_SILVIO.theme },
           view_count: 0,
           created_at: new Date().toISOString(),
         };
-        seedLinks = SEED_LINKS_DEMO;
-        seedSocial = SEED_SOCIAL_DEMO;
-      }
-
-      this.db.profiles.push(baseProfile);
-
-      // Populate seed links for this profile if none exist
-      if (!this.db.links.some(l => l.profile_id === baseProfile.id)) {
-        this.db.links.push(...seedLinks.map((l, i) => ({ ...l, id: `link_${baseProfile.id}_${i}`, profile_id: baseProfile.id })));
-      }
-      if (!this.db.social_icons.some(s => s.profile_id === baseProfile.id)) {
-        this.db.social_icons.push(...seedSocial.map((s, i) => ({ ...s, id: `soc_${baseProfile.id}_${i}`, profile_id: baseProfile.id })));
+        this.db.profiles.push(profile);
       }
       saveDbState(this.db);
     }
@@ -535,19 +525,24 @@ class LocalSupabaseSimulator {
     const cleanEmail = email.toLowerCase().trim();
     let existingUser = this.db.users.find(u => u.email.toLowerCase() === cleanEmail);
     if (existingUser) {
-      if (password) existingUser.passwordHash = password;
-      saveDbState(this.db);
-      const session: AuthSession = {
-        user: { id: existingUser.id, email: existingUser.email },
-        access_token: 'mock-jwt-token-' + Math.random().toString(36).substring(2),
+      return {
+        data: { session: null, user: null },
+        error: { message: 'This email is already registered. Please log in using this account.' },
       };
-      this.setSession(session);
-      return { data: { session, user: session.user }, error: null };
     }
 
-    const username = (options?.data?.username || cleanEmail.split('@')[0])
+    const requestedUsername = (options?.data?.username || cleanEmail.split('@')[0])
       .toLowerCase()
       .replace(/[^a-z0-9_-]/g, '');
+
+    let finalUsername = requestedUsername || 'creator';
+    // Check if username is already taken by another profile
+    if (this.db.profiles.some(p => p.username.toLowerCase() === finalUsername.toLowerCase())) {
+      return {
+        data: { session: null, user: null },
+        error: { message: `Username "@${finalUsername}" is already taken. Please choose another username.` },
+      };
+    }
 
     const newUserId = 'usr_' + Math.random().toString(36).substring(2, 10);
     const newProfileId = 'prof_' + Math.random().toString(36).substring(2, 10);
@@ -562,10 +557,10 @@ class LocalSupabaseSimulator {
     const newProfile: Profile = {
       id: newProfileId,
       user_id: newUserId,
-      username: username || 'user_' + Math.random().toString(36).substring(2, 6),
-      display_name: options?.data?.display_name || username || 'Creator',
+      username: finalUsername,
+      display_name: options?.data?.display_name || finalUsername,
       bio: 'Welcome to my LinkNest profile! 🌟',
-      avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
+      avatar_url: '/icon.svg',
       theme: {
         bg_type: 'preset',
         bg_value: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #000000 100%)',
@@ -581,6 +576,26 @@ class LocalSupabaseSimulator {
       created_at: new Date().toISOString(),
     };
     this.db.profiles.push(newProfile);
+
+    // Initial starter link for the new user, strictly scoped to this profile
+    this.db.links.push({
+      id: `link_${newProfileId}_1`,
+      profile_id: newProfileId,
+      title: 'Official Website',
+      url: 'https://linknest.app',
+      icon: 'globe',
+      category: 'General',
+      description: 'Welcome to my official page',
+      is_active: true,
+      is_featured: false,
+      position: 0,
+      click_count: 0,
+      start_date: null,
+      end_date: null,
+      last_clicked_at: null,
+      created_at: new Date().toISOString(),
+    });
+
     saveDbState(this.db);
 
     const session: AuthSession = {
@@ -597,7 +612,63 @@ class LocalSupabaseSimulator {
   }
 
   public async resetPasswordForEmail(email: string, _options?: { redirectTo?: string }) {
+    this.db = getInitialDbState();
+    const cleanEmail = email.toLowerCase().trim();
+    if (!this.db.users) this.db.users = [];
+    let user = this.db.users.find(u => u.email.toLowerCase() === cleanEmail);
+    if (!user) {
+      const isKnownEmail =
+        cleanEmail === 'viochristian860@gmail.com' ||
+        cleanEmail === 'viochristian12@gmail.com' ||
+        cleanEmail === 'silvio@linknest.app' ||
+        cleanEmail === 'demo@linknest.app' ||
+        cleanEmail === 'demo@example.com';
+      if (isKnownEmail) {
+        user = {
+          id: cleanEmail.includes('demo') ? SEED_PROFILE_DEMO.user_id : SEED_PROFILE_SILVIO.user_id,
+          email: cleanEmail,
+          passwordHash: 'demo123',
+        };
+        this.db.users.push(user);
+        saveDbState(this.db);
+      }
+    }
+    if (!user) {
+      return {
+        data: null,
+        error: { message: 'Account not found.' },
+      };
+    }
     return { data: {}, error: null };
+  }
+
+  public async updatePasswordDirectly(email: string, newPassword: string) {
+    this.db = getInitialDbState();
+    const cleanEmail = email.toLowerCase().trim();
+    if (!this.db.users) this.db.users = [];
+    let user = this.db.users.find(u => u.email.toLowerCase() === cleanEmail);
+    if (!user) {
+      const isKnownEmail =
+        cleanEmail === 'viochristian860@gmail.com' ||
+        cleanEmail === 'viochristian12@gmail.com' ||
+        cleanEmail === 'silvio@linknest.app' ||
+        cleanEmail === 'demo@linknest.app' ||
+        cleanEmail === 'demo@example.com';
+      if (isKnownEmail) {
+        user = {
+          id: cleanEmail.includes('demo') ? SEED_PROFILE_DEMO.user_id : SEED_PROFILE_SILVIO.user_id,
+          email: cleanEmail,
+          passwordHash: newPassword,
+        };
+        this.db.users.push(user);
+      } else {
+        return { data: null, error: { message: 'Account not found.' } };
+      }
+    } else {
+      user.passwordHash = newPassword;
+    }
+    saveDbState(this.db);
+    return { data: { user }, error: null };
   }
 
   // RPC: increment_view_count
@@ -1167,9 +1238,19 @@ export const supabase = {
               return res;
             }
 
-            // Fallback to local simulator for demo accounts (e.g. silvio@linknest.app) or offline testing
+            // Fallback to local simulator for local accounts or offline testing
             const localRes = await localSimulator.auth.signInWithPassword(credentials);
             if (!localRes.error && localRes.data?.session) return localRes;
+
+            // If real client had a network/fetch error or if local simulator returned a specific validation error, prefer localRes
+            if (
+              !res.error ||
+              res.error.message?.toLowerCase().includes('failed to fetch') ||
+              res.error.message?.toLowerCase().includes('networkerror') ||
+              localRes?.error
+            ) {
+              return localRes;
+            }
 
             return res;
           } catch {
@@ -1269,8 +1350,19 @@ export const supabase = {
             return { error: null };
           }
         },
-        resetPasswordForEmail: (email: string, options?: { redirectTo?: string }) => {
-          return realClient!.auth.resetPasswordForEmail(email, options);
+        resetPasswordForEmail: async (email: string, options?: { redirectTo?: string }) => {
+          try {
+            const res = await realClient!.auth.resetPasswordForEmail(email, options);
+            if (!res.error) return res;
+
+            // If network fails or project offline, fallback to local simulator
+            return await localSimulator.auth.resetPasswordForEmail(email, options);
+          } catch {
+            return await localSimulator.auth.resetPasswordForEmail(email, options);
+          }
+        },
+        updatePasswordDirectly: async (email: string, newPassword: string) => {
+          return await localSimulator.auth.updatePasswordDirectly(email, newPassword);
         },
       };
     }

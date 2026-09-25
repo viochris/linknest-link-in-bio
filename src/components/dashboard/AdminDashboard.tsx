@@ -48,11 +48,14 @@ interface AdminDashboardProps {
 
 // Helper to generate an immediate, bulletproof fallback profile
 const createResilientProfile = (usr: AuthUser): Profile => {
+  const cleanEmail = (usr.email || '').toLowerCase().trim();
   const isSilvio =
-    usr.email?.toLowerCase().includes('silvio') ||
-    usr.email?.toLowerCase().includes('viochristian') ||
+    cleanEmail === 'viochristian860@gmail.com' ||
+    cleanEmail === 'viochristian12@gmail.com' ||
+    cleanEmail === 'silvio@linknest.app' ||
     usr.id === 'user-silvio-001' ||
-    usr.id === SEED_PROFILE_SILVIO.id;
+    usr.id === SEED_PROFILE_SILVIO.id ||
+    usr.id === SEED_PROFILE_SILVIO.user_id;
 
   if (isSilvio) {
     return {
@@ -64,9 +67,11 @@ const createResilientProfile = (usr: AuthUser): Profile => {
   }
 
   const isDemo =
-    usr.email?.toLowerCase().includes('demo') ||
+    cleanEmail === 'demo@linknest.app' ||
+    cleanEmail === 'demo@example.com' ||
     usr.id === 'user-demo-001' ||
-    usr.id === SEED_PROFILE_DEMO.id;
+    usr.id === SEED_PROFILE_DEMO.id ||
+    usr.id === SEED_PROFILE_DEMO.user_id;
 
   if (isDemo) {
     return {
@@ -94,19 +99,41 @@ const createResilientProfile = (usr: AuthUser): Profile => {
 
 // Helper to get seed links depending on whether it is Silvio's authentic account or Demo
 const getSeedLinksForProfile = (prof: Profile): LinkItem[] => {
-  const u = (prof.username || '').toLowerCase();
-  if (u === 'silvio' || u.includes('silvio') || u.includes('viochristian') || u.includes('viochris')) {
+  if (prof.id === SEED_PROFILE_SILVIO.id || prof.username?.toLowerCase() === 'silvio') {
     return SEED_LINKS_SILVIO;
   }
-  return SEED_LINKS_DEMO;
+  if (prof.id === SEED_PROFILE_DEMO.id || prof.username?.toLowerCase() === 'demo') {
+    return SEED_LINKS_DEMO;
+  }
+  return [
+    {
+      id: `link_${prof.id}_1`,
+      profile_id: prof.id,
+      title: 'My Website',
+      url: 'https://linknest.app',
+      icon: 'globe',
+      category: 'General',
+      description: 'Check out my official page',
+      is_active: true,
+      is_featured: false,
+      position: 0,
+      click_count: 0,
+      start_date: null,
+      end_date: null,
+      last_clicked_at: null,
+      created_at: new Date().toISOString(),
+    },
+  ];
 };
 
 const getSeedSocialForProfile = (prof: Profile): SocialIconItem[] => {
-  const u = (prof.username || '').toLowerCase();
-  if (u === 'silvio' || u.includes('silvio') || u.includes('viochristian') || u.includes('viochris')) {
+  if (prof.id === SEED_PROFILE_SILVIO.id || prof.username?.toLowerCase() === 'silvio') {
     return SEED_SOCIAL_SILVIO;
   }
-  return SEED_SOCIAL_DEMO;
+  if (prof.id === SEED_PROFILE_DEMO.id || prof.username?.toLowerCase() === 'demo') {
+    return SEED_SOCIAL_DEMO;
+  }
+  return [];
 };
 
 // Timeout wrapper that guarantees promises never hang the UI
